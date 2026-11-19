@@ -174,6 +174,23 @@ describe("a run against local sites", () => {
     }
   });
 
+  it("init writes a config that runs at once, with alerts only for webhook variables that are set", async () => {
+    const cwd = process.cwd();
+    process.chdir(dir);
+    const saved = process.env.DISCORD_WEBHOOK_URL;
+    try {
+      delete process.env.DISCORD_WEBHOOK_URL;
+      expect(await run(["init", "https://example.com"])).toBe(0);
+      const file = JSON.parse(await readFile(join(dir, "monitor.config.json"), "utf8"));
+      expect(file.alerts).toEqual([]);
+      expect(parseConfig(file, {}).config.sites[0]!.slug).toBe("example-com");
+      expect(await run(["init", "https://example.com"])).toBe(2);
+    } finally {
+      process.chdir(cwd);
+      if (saved !== undefined) process.env.DISCORD_WEBHOOK_URL = saved;
+    }
+  });
+
   it("check mode exits 1 while something fails, 0 once it passes", async () => {
     const site = await testServer({ "/": { status: 503, body: "down" } });
     const cfg = join(dir, "monitor.config.json");

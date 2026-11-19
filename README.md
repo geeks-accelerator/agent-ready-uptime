@@ -7,8 +7,8 @@ Made by [Sites in the Woods](https://sitesinthewoods.com), which runs these same
 Most monitors ask whether your homepage answers. This one also watches what AI agents and crawlers meet: your `llms.txt`, agent card, OpenAPI and MCP manifest, whether GPTBot, ClaudeBot and the rest can still get in, and whether your MCP server's tools were renamed, removed or changed shape. An agent that called `adopt` yesterday fails today if it's now `adopt_v2`; this tells you first.
 
 ```bash
+export DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/…   # or SLACK_WEBHOOK_URL; optional
 npx agent-ready-uptime init https://your.site
-export DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/…
 npx agent-ready-uptime watch
 ```
 

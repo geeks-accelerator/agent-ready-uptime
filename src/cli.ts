@@ -70,11 +70,16 @@ async function command(argv: string[]): Promise<number | null> {
   if (command === "init") {
     if (!rest.length) fail("init needs at least one site URL, e.g. agent-ready-uptime init https://example.com");
     if (existsSync("monitor.config.json")) fail("monitor.config.json already exists");
-    const c = configFromEnv({ SITES: rest.join(",") }) as { sites: unknown[] };
-    const file = { $schema: "https://unpkg.com/agent-ready-uptime/monitor.config.schema.json", sites: c.sites, alerts: [{ kind: "discord", env: "DISCORD_WEBHOOK_URL" }] };
-    parseConfig(file, { DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/00000/placeholder-placeholder" });
+    // Alerts only for a webhook variable that's set now: one naming an unset variable would stop every run.
+    const c = configFromEnv({ ...process.env, SITES: rest.join(",") }) as { sites: unknown[]; alerts: unknown[] };
+    const file = { $schema: "https://unpkg.com/agent-ready-uptime/monitor.config.schema.json", sites: c.sites, alerts: c.alerts };
+    parseConfig(file);
     await writeFile("monitor.config.json", `${JSON.stringify(file, null, 2)}\n`);
-    process.stdout.write("Wrote monitor.config.json. Set DISCORD_WEBHOOK_URL (or edit alerts), then run: npx agent-ready-uptime watch\n");
+    process.stdout.write(
+      c.alerts.length
+        ? "Wrote monitor.config.json. Run: npx agent-ready-uptime watch\n"
+        : 'Wrote monitor.config.json, with no alerts yet: set DISCORD_WEBHOOK_URL or SLACK_WEBHOOK_URL and add { "kind": "discord", "env": "DISCORD_WEBHOOK_URL" } to "alerts". Run: npx agent-ready-uptime watch\n',
+    );
     return 0;
   }
 
