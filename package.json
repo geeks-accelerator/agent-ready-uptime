@@ -1,18 +1,57 @@
 {
-  "name": "agent-ready-uptime-workspace",
-  "private": true,
+  "name": "agent-ready-uptime",
+  "version": "0.1.0",
+  "description": "Agent-ready uptime monitoring, open source: uptime, TLS and domain expiry, sitemaps, llms.txt, AI crawler access and MCP tool changes, with alerts to Discord or Slack and a status page. Its checks are a library too.",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=26"
   },
-  "workspaces": [
-    "packages/checks",
-    "packages/uptime"
+  "bin": {
+    "agent-ready-uptime": "dist/bin.js"
+  },
+  "exports": {
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "monitor.config.schema.json",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "npm run build -w agent-ready-checks && npm run build -w agent-ready-uptime",
-    "typecheck": "tsc --noEmit -p packages/checks && tsc --noEmit -p packages/uptime",
-    "test": "npm test -w agent-ready-checks && npm test -w agent-ready-uptime"
+    "build": "tsc -p tsconfig.build.json && node dist/bin.js schema > monitor.config.schema.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "htmlparser2": "^12.0.0",
+    "saxes": "^6.0.0",
+    "zod": "^4.6.7"
+  },
+  "keywords": [
+    "uptime-monitor",
+    "uptime-monitoring",
+    "website-monitoring",
+    "status-page",
+    "self-hosted",
+    "mcp",
+    "model-context-protocol",
+    "llms-txt",
+    "ai-agents",
+    "agent-readiness",
+    "ai-crawlers",
+    "robots-txt",
+    "discord",
+    "slack",
+    "railway"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geeks-accelerator/agent-ready-uptime.git"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { carryRobotsState, decidingRule, lostPairs, parseRobots, robotsDiff, robotsState, robotsSummary, probeCrawler, probeName, probeUrl } from "../src/robots.js";
-import { page } from "../src/testing/servers.js";
-import { requestHeaders } from "../src/http/request.js";
+import { carryRobotsState, decidingRule, lostPairs, parseRobots, robotsDiff, robotsState, robotsSummary, probeCrawler, probeName, probeUrl } from "../../src/checks/robots.js";
+import { page } from "../../src/checks/testing/servers.js";
+import { requestHeaders } from "../../src/checks/http/request.js";
 
 describe("robots.txt parsing (RFC 9309, Google's precedence)", () => {
   it("groups user-agents, ignores comments and unknown lines, reads Sitemap lines", () => {

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
-import { openDefaultsShape, openSiteSchema, type OpenSite } from "agent-ready-checks/config";
-import { isWebhook, WEBHOOK_EXAMPLE, WEBHOOK_KINDS, type WebhookKind } from "agent-ready-checks/webhook";
+import { openDefaultsShape, openSiteSchema, type OpenSite } from "./checks/config.js";
+import { isWebhook, WEBHOOK_EXAMPLE, WEBHOOK_KINDS, type WebhookKind } from "./checks/webhook.js";
 
 /**
  * monitor.config.json: the sites (the same keys the hosted service reads, from the

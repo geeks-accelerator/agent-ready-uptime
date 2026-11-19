@@ -2,4 +2,4 @@
 
 ## 0.1.0
 
-The first release: `agent-ready-checks` (the checks Sites in the Woods runs on) and `agent-ready-uptime` (the runner: watch and check modes, Discord and Slack alerts, a state file and a status page).
+The first release: the runner (watch and check modes, Discord and Slack alerts, a state file and a status page) and its checks, usable as a library (`agent-ready-uptime/checks/…`), the same ones Sites in the Woods runs on.

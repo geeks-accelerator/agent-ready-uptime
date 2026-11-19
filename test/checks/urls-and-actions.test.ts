@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { looksLikeAction, looksLikeLinkAction } from "../src/actions.js";
-import { measureHtml } from "../src/html/weight.js";
-import { fetchUrl } from "../src/http/request.js";
-import { crawlDelay, namesAgent, parseRobots } from "../src/robots.js";
-import { discoverSitemaps } from "../src/sitemap/fetch.js";
-import { isPublicSuffix, journeyHosts, pageKey, pathPattern, sameRegistrable, scanKey, sharedHost, stripTracking, toALabel } from "../src/url.js";
-import { testServer, urlset } from "../src/testing/servers.js";
+import { looksLikeAction, looksLikeLinkAction } from "../../src/checks/actions.js";
+import { measureHtml } from "../../src/checks/html/weight.js";
+import { fetchUrl } from "../../src/checks/http/request.js";
+import { crawlDelay, namesAgent, parseRobots } from "../../src/checks/robots.js";
+import { discoverSitemaps } from "../../src/checks/sitemap/fetch.js";
+import { isPublicSuffix, journeyHosts, pageKey, pathPattern, sameRegistrable, scanKey, sharedHost, stripTracking, toALabel } from "../../src/checks/url.js";
+import { testServer, urlset } from "../../src/checks/testing/servers.js";
 
 describe("URL keys (0.8)", () => {
   it("one page key: no www, query, hash, trailing slash or index.html; a non-default port kept", () => {

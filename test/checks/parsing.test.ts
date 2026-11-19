@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { gzipSync } from "node:zlib";
-import { parseHead, headerNoindex } from "../src/html/head.js";
-import { apexDomain, isHttpUrl, normalizeForCompare, sameUrl, siteUrl, normaliseUrl } from "../src/url.js";
-import { safeHref } from "../src/html/template.js";
-import { parseSitemap, SitemapParseError } from "../src/sitemap/parse.js";
-import { parseRdap, badStatuses } from "../src/domain/rdap.js";
-import { measureHtml, speculationRules } from "../src/html/weight.js";
+import { parseHead, headerNoindex } from "../../src/checks/html/head.js";
+import { apexDomain, isHttpUrl, normalizeForCompare, sameUrl, siteUrl, normaliseUrl } from "../../src/checks/url.js";
+import { safeHref } from "../../src/checks/html/template.js";
+import { parseSitemap, SitemapParseError } from "../../src/checks/sitemap/parse.js";
+import { parseRdap, badStatuses } from "../../src/checks/domain/rdap.js";
+import { measureHtml, speculationRules } from "../../src/checks/html/weight.js";
 import https from "node:https";
 
 describe("url helpers", () => {

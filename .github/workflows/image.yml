@@ -1,5 +1,5 @@
 # Builds the runner's Docker image and pushes it to ghcr.io/geeks-accelerator/agent-ready-uptime
-# with the repository's own token: on a release tagged uptime-v<version> (tagged with the version
+# with the repository's own token: on a release tagged v<version> (tagged with the version
 # and latest), or by hand (latest only).
 name: Image
 
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   image:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref_name, 'uptime-v')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref_name, 'v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,7 +30,7 @@ jobs:
         id: tags
         run: |
           tags="ghcr.io/${GITHUB_REPOSITORY}:latest"
-          case "$GITHUB_REF_NAME" in uptime-v*) tags="$tags,ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF_NAME#uptime-v}" ;; esac
+          case "$GITHUB_REF_NAME" in v*) tags="$tags,ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF_NAME#v}" ;; esac
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v7
         with:

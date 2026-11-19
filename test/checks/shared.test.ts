@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { linePaths, msAxis } from "../src/chart.js";
-import { openDefaultsShape, openSiteSchema } from "../src/config.js";
-import { ms } from "../src/format.js";
-import { esc, html, raw, safeHref } from "../src/html/template.js";
-import { addFailure, bucketFor, daysUntil, isDown, NO_STREAK } from "../src/rules.js";
-import { runSpec, specSchema, type Checkers } from "../src/spec.js";
-import { isWebhook, maskWebhook, postWithRetries } from "../src/webhook.js";
-import { testServer } from "../src/testing/servers.js";
-import { syntheticResult } from "../src/http/page-check.js";
+import { linePaths, msAxis } from "../../src/checks/chart.js";
+import { openDefaultsShape, openSiteSchema } from "../../src/checks/config.js";
+import { ms } from "../../src/checks/format.js";
+import { esc, html, raw, safeHref } from "../../src/checks/html/template.js";
+import { addFailure, bucketFor, daysUntil, isDown, NO_STREAK } from "../../src/checks/rules.js";
+import { runSpec, specSchema, type Checkers } from "../../src/checks/spec.js";
+import { isWebhook, maskWebhook, postWithRetries } from "../../src/checks/webhook.js";
+import { testServer } from "../../src/checks/testing/servers.js";
+import { syntheticResult } from "../../src/checks/http/page-check.js";
 
 describe("a check from a spec", () => {
   it("runs each kind with its own checker", async () => {

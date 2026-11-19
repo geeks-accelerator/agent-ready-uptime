@@ -1,7 +1,7 @@
-import { linePaths, msAxis } from "agent-ready-checks/chart";
-import { ms } from "agent-ready-checks/format";
-import { html, raw, safeHref, type Raw } from "agent-ready-checks/html/template";
-import { daysUntil } from "agent-ready-checks/rules";
+import { linePaths, msAxis } from "./checks/chart.js";
+import { ms } from "./checks/format.js";
+import { html, raw, safeHref, type Raw } from "./checks/html/template.js";
+import { daysUntil } from "./checks/rules.js";
 import type { Config, Site } from "./config.js";
 import { HISTORY_MS, type HistoryPoint, type State, type TargetState } from "./state.js";
 import type { Target } from "./targets.js";

@@ -1,11 +1,11 @@
 import http from "node:http";
 import { type AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import { fetchUrl, isPrivateAddress } from "../src/http/request.js";
-import { checkPage, describeError } from "../src/http/page-check.js";
-import { siteOrigins } from "../src/url.js";
-import { testServer } from "../src/testing/servers.js";
-import { ms } from "../src/format.js";
+import { fetchUrl, isPrivateAddress } from "../../src/checks/http/request.js";
+import { checkPage, describeError } from "../../src/checks/http/page-check.js";
+import { siteOrigins } from "../../src/checks/url.js";
+import { testServer } from "../../src/checks/testing/servers.js";
+import { ms } from "../../src/checks/format.js";
 
 describe("checkPage", () => {
   it("stops at the headers when the body isn't wanted", async () => {

@@ -1,8 +1,8 @@
 import tls from "node:tls";
 import { describe, expect, it } from "vitest";
-import { checkPort } from "../src/net/port.js";
-import { describeRecordChange, normalise } from "../src/net/dns.js";
-import { specSchema } from "../src/spec.js";
+import { checkPort } from "../../src/checks/net/port.js";
+import { describeRecordChange, normalise } from "../../src/checks/net/dns.js";
+import { specSchema } from "../../src/checks/spec.js";
 
 describe("TCP port checks", () => {
   it("refuses a private address unless local addresses are switched on", async () => {

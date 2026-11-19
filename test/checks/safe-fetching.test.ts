@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { fetchOnHost } from "../src/http/same-host.js";
-import { fetchUrl } from "../src/http/request.js";
-import { jsonLd, pageMeta } from "../src/html/head.js";
-import { decidingRule, parseRobots, robotsState } from "../src/robots.js";
-import { testServer } from "../src/testing/servers.js";
+import { fetchOnHost } from "../../src/checks/http/same-host.js";
+import { fetchUrl } from "../../src/checks/http/request.js";
+import { jsonLd, pageMeta } from "../../src/checks/html/head.js";
+import { decidingRule, parseRobots, robotsState } from "../../src/checks/robots.js";
+import { testServer } from "../../src/checks/testing/servers.js";
 
 describe("fetchOnHost: redirects only on the site's own host", () => {
   it("follows the host's own redirects, stops at another host's without fetching it, and stops after the hop limit", async () => {

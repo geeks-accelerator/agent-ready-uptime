@@ -93,9 +93,49 @@ It binds to 127.0.0.1 by default. It lists the sites you watch, so exposing it (
 
 It checks from one place (yours), keeps 24 hours, and sends one message per alert. [Sites in the Woods](https://sitesinthewoods.com) is the hosted version, built on the same checks: it confirms an outage from a second region before anyone's alerted, keeps 400 days of history with likely causes, sends AI agents through your site's real tasks (journeys), grades your API's errors for a way forward, and adds email, push, teams and public status pages.
 
-## The checks package
+## The checks, as a library
 
-The checks themselves are [`agent-ready-checks`](packages/checks), usable on their own. [`readiness-audit`](https://github.com/geeks-accelerator/agent-and-search-readiness) scores a site once against the Agent and Search Readiness Standard; this watches it. The audit tells you once; the monitor tells you when it breaks.
+The checks the runner uses are in the same package, one request at a time, each returning a plain result. [Sites in the Woods](https://sitesinthewoods.com) runs on them too, so a fix to a check helps both.
+
+```ts
+import { checkPage } from "agent-ready-uptime/checks/http/page-check";
+import { checkMcp } from "agent-ready-uptime/checks/mcp/check";
+
+const home = await checkPage("https://example.com/", { keyword: "Welcome" });
+console.log(home.ok, home.timings.ttfbMs, home.tls?.validTo);
+
+const mcp = await checkMcp("https://example.com/mcp");
+console.log(mcp.ok, mcp.fingerprint); // changes when a tool is renamed, removed or changes shape
+```
+
+Each module is `agent-ready-uptime/checks/<module>`:
+
+| Module | What it does |
+|---|---|
+| `http/request` | `fetchUrl`: one request with DNS, connect, TLS and first-byte timings, the certificate's expiry, a size cap, and private addresses refused |
+| `http/page-check` | `checkPage`: a page judged (status, keyword, final URL, title and noindex, an agent file's format) |
+| `http/same-host` | `fetchOnHost`: redirects followed only on the site's own host |
+| `agent/discover`, `agent/validate` | find and validate `llms.txt`, the agent card, OpenAPI, the MCP manifest, `robots.txt` and `security.txt`; the crawler probes |
+| `mcp/check`, `mcp/diff` | an MCP handshake and tool list, fingerprinted; what changed between two lists |
+| `sitemap/fetch`, `sitemap/parse` | discover, fetch and parse XML, news and JSON sitemaps and indexes, gzip included, with size caps |
+| `net/port`, `net/dns` | a TCP (and TLS) port check; a record set asked of the zone's own nameservers |
+| `domain/rdap` | a domain's expiry, registrar and status from RDAP |
+| `robots` | robots.txt parsed by RFC 9309 with Google's precedence; what each AI crawler may read |
+| `spec` | a check as data (`CheckSpec`), run by `runSpec`, validated by `specSchema` |
+| `rules` | when a failure is news (three in a row for a page) and when an expiry is announced |
+| `config` | a site's config keys (zod), shared with the hosted service |
+| `webhook` | Discord and Slack webhook URLs checked by host; posting with retries |
+| `chart`, `format`, `html/template` | a line's geometry with gaps kept, round axes, response times in words, escaped HTML |
+| `testing/servers`, `testing/fake-mcp` | local sites and an MCP server for tests |
+
+### Safety
+
+- Private, loopback and link-local addresses (raw IPs included) are refused, checked on the address each request actually connects to. `MONITOR_ALLOW_LOCAL=1` allows local URLs for tests; never set it when deployed.
+- No cookies or credentials are sent. `fetchOnHost` (and `checkPage`'s `sameHost`) follow redirects only on the site's own host, for callers that must not leave it.
+- Bodies are read up to a cap, and every pattern run over a body is bounded, so a hostile site can't stall a check.
+- `FINGERPRINT_VERSION` prefixes every fingerprint: if its recipe changes, the version changes, and stored fingerprints are replaced quietly instead of alerting.
+
+[`readiness-audit`](https://github.com/geeks-accelerator/agent-and-search-readiness) scores a site once against the Agent and Search Readiness Standard; this watches it. The audit tells you once; the monitor tells you when it breaks. Report a security problem privately: see [SECURITY.md](SECURITY.md).
 
 ## License
 

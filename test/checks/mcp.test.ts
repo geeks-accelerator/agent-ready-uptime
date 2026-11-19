@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { checkMcp, canonicalJson, FINGERPRINT_VERSION } from "../src/mcp/check.js";
-import { fakeMcpServer, testServer } from "../src/testing/servers.js";
+import { checkMcp, canonicalJson, FINGERPRINT_VERSION } from "../../src/checks/mcp/check.js";
+import { fakeMcpServer, testServer } from "../../src/checks/testing/servers.js";
 
 describe("checkMcp", () => {
   let mcp: Awaited<ReturnType<typeof fakeMcpServer>> | null = null;

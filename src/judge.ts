@@ -1,7 +1,7 @@
-import { FINGERPRINT_VERSION } from "agent-ready-checks/mcp/check";
-import { describeToolChange } from "agent-ready-checks/mcp/diff";
-import { describeRecordChange } from "agent-ready-checks/net/dns";
-import { addFailure, bucketFor, daysUntil, DOMAIN_BUCKETS, isDown, NO_STREAK, SSL_BUCKETS } from "agent-ready-checks/rules";
+import { FINGERPRINT_VERSION } from "./checks/mcp/check.js";
+import { describeToolChange } from "./checks/mcp/diff.js";
+import { describeRecordChange } from "./checks/net/dns.js";
+import { addFailure, bucketFor, daysUntil, DOMAIN_BUCKETS, isDown, NO_STREAK, SSL_BUCKETS } from "./checks/rules.js";
 import type { TargetState } from "./state.js";
 import type { Target } from "./targets.js";
 

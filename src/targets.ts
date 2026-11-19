@@ -1,10 +1,10 @@
-import type { AgentTargetSpec } from "agent-ready-checks/agent/discover";
-import { AGENT_FILE_LABELS } from "agent-ready-checks/agent/validate";
-import { NOTIFY_CHANGES_BY_DEFAULT } from "agent-ready-checks/net/dns";
-import { probeName } from "agent-ready-checks/robots";
-import { PAGE_RETRIES, WARN_CONFIRM } from "agent-ready-checks/rules";
-import { targetSpec, type CheckSpec } from "agent-ready-checks/spec";
-import { apexDomain, siteUrl } from "agent-ready-checks/url";
+import type { AgentTargetSpec } from "./checks/agent/discover.js";
+import { AGENT_FILE_LABELS } from "./checks/agent/validate.js";
+import { NOTIFY_CHANGES_BY_DEFAULT } from "./checks/net/dns.js";
+import { probeName } from "./checks/robots.js";
+import { PAGE_RETRIES, WARN_CONFIRM } from "./checks/rules.js";
+import { targetSpec, type CheckSpec } from "./checks/spec.js";
+import { apexDomain, siteUrl } from "./checks/url.js";
 import type { Config, Site } from "./config.js";
 
 /** What one target is: a spec the checks package runs, or a sitemap or a domain's registration, which have their own fetches. */

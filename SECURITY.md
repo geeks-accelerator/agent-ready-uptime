@@ -8,4 +8,4 @@ What protects the machine that runs it:
 - **Webhooks only to their services.** A Discord or Slack webhook URL is used only if it's on that service's own webhook host, checked when the config loads and before every post. Discord messages mention no one.
 - **The status page changes nothing.** GET only, no forms, a strict Content-Security-Policy, and every word a site sent is escaped. It binds to 127.0.0.1 unless you choose otherwise.
 
-In scope: the checks package (`packages/checks`), the runner (`packages/uptime`), the Docker image and the Railway template.
+In scope: the npm package (the checks in `src/checks` and the runner), the Docker image and the Railway template.

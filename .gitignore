@@ -2,6 +2,6 @@ node_modules/
 dist/
 .agent-ready-uptime/
 monitor.config.json
-packages/uptime/monitor.config.schema.json
+monitor.config.schema.json
 *.log
 .DS_Store
