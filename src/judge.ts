@@ -29,8 +29,26 @@ export interface Alert {
   title: string;
   /** Why, when there's more to say. */
   detail: string | null;
+  /** A moment the alert refers to, written by each destination in its reader's own timezone (`alertDetail`). */
+  when?: { at: string; word: "Since" | "On"; show: "time" | "date" };
   url: string;
   at: string;
+}
+
+export type TimeFormat = "utc" | "discord" | "slack";
+
+/**
+ * The detail with its moment written for where it's going: Discord's `<t:…>` and Slack's
+ * `<!date^…>` render in each reader's timezone (Slack falls back to the UTC text); logs say UTC.
+ */
+export function alertDetail(a: Alert, format: TimeFormat): string | null {
+  if (!a.when) return a.detail;
+  const ms = Date.parse(a.when.at);
+  const unix = Math.floor(ms / 1000);
+  const utc = a.when.show === "time" ? `${a.when.at.slice(11, 16)} UTC` : a.when.at.slice(0, 10);
+  const written =
+    format === "discord" ? `<t:${unix}:${a.when.show === "time" ? "t" : "D"}>` : format === "slack" ? `<!date^${unix}^${a.when.show === "time" ? "{time}" : "{date_short}"}|${utc}>` : utc;
+  return [a.detail, `${a.when.word} ${written}.`].filter(Boolean).join(" ");
 }
 
 /**
@@ -42,7 +60,7 @@ export interface Alert {
  */
 export function judge(t: Target, before: TargetState, o: Outcome, siteName: string): { state: TargetState; alerts: Alert[] } {
   const alerts: Alert[] = [];
-  const alert = (kind: AlertKind, title: string, detail: string | null = null) => alerts.push({ kind, site: t.site, target: t.label, title, detail, url: t.url, at: o.checkedAt });
+  const alert = (kind: AlertKind, title: string, detail: string | null = null, when?: Alert["when"]) => alerts.push({ kind, site: t.site, target: t.label, title, detail, ...(when ? { when } : {}), url: t.url, at: o.checkedAt });
   const outage = t.kind === "homepage" || t.kind === "port";
   const s: TargetState = { ...before, checkedAt: o.checkedAt, error: o.error, detail: o.detail, ttfbMs: o.ttfbMs };
   if (before.ok !== o.ok) s.since = o.checkedAt;
@@ -61,7 +79,7 @@ export function judge(t: Target, before: TargetState, o: Outcome, siteName: stri
   s.streak = NO_STREAK;
   if (before.alerted) {
     s.alerted = false;
-    alert(outage ? "up" : "recovered", outage ? `${siteName}: ${t.label} is back up` : `${siteName}: ${t.label} is passing again`, before.since ? `${outage ? "Down" : "Failing"} for ${lasted(Date.parse(o.checkedAt) - Date.parse(before.since))}, since ${before.since.slice(11, 16)} UTC.` : null);
+    alert(outage ? "up" : "recovered", outage ? `${siteName}: ${t.label} is back up` : `${siteName}: ${t.label} is passing again`, before.since ? `${outage ? "Down" : "Failing"} for ${lasted(Date.parse(o.checkedAt) - Date.parse(before.since))}.` : null, before.since ? { at: before.since, word: "Since", show: "time" } : undefined);
   }
 
   // What it lists changed: an MCP server's tools, or a DNS record set (announced by type).
@@ -86,7 +104,7 @@ export function judge(t: Target, before: TargetState, o: Outcome, siteName: stri
       s.announcedBucket = bucket;
       const days = Math.max(0, Math.floor(daysUntil(o.expiresAt!, Date.parse(o.checkedAt))));
       const what = t.kind === "domain" ? `${t.label} expires` : `${siteName}'s TLS certificate expires`;
-      alert("expiring", `${t.kind === "domain" ? `${siteName}: ` : ""}${what} in ${days} day${days === 1 ? "" : "s"}`, `On ${o.expiresAt!.slice(0, 10)}.`);
+      alert("expiring", `${t.kind === "domain" ? `${siteName}: ` : ""}${what} in ${days} day${days === 1 ? "" : "s"}`, null, { at: o.expiresAt!, word: "On", show: "date" });
     }
   }
   return { state: s, alerts };

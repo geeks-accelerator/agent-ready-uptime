@@ -1,7 +1,7 @@
 import { postWithRetries, type SendResult } from "./checks/webhook.js";
 import { isWebhook } from "./checks/webhook.js";
 import type { Webhook } from "./config.js";
-import type { Alert, AlertKind } from "./judge.js";
+import { alertDetail, type Alert, type AlertKind } from "./judge.js";
 
 /**
  * One message per alert, to every webhook: what broke and nothing else (no link to
@@ -18,14 +18,20 @@ export function discordPayload(a: Alert): unknown {
   return {
     username: "agent-ready-uptime",
     allowed_mentions: { parse: [] },
-    embeds: [{ title: cut(a.title, 256), description: cut([a.detail, a.url].filter(Boolean).join("\n"), 4096), color: COLOR[a.kind], timestamp: a.at }],
+    embeds: [{ title: cut(a.title, 256), description: cut([alertDetail(a, "discord"), a.url].filter(Boolean).join("\n"), 4096), color: COLOR[a.kind], timestamp: a.at }],
   };
 }
 
 export function slackPayload(a: Alert): unknown {
   // Slack's mrkdwn: escape &, < and > so a site's text can't make a link or a mention.
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return { text: cut([`${EMOJI[a.kind]} *${esc(a.title)}*`, a.detail ? esc(a.detail) : null, esc(a.url)].filter(Boolean).join("\n"), 3000) };
+  return { text: cut([`${EMOJI[a.kind]} *${esc(a.title)}*`, slackDetail(a, esc), esc(a.url)].filter(Boolean).join("\n"), 3000) };
+}
+
+/** Slack: the site's words escaped, our date markup left as markup. */
+function slackDetail(a: Alert, esc: (s: string) => string): string | null {
+  const escaped = { ...a, detail: a.detail === null ? null : esc(a.detail) };
+  return alertDetail(escaped, "slack");
 }
 
 export interface Sender {

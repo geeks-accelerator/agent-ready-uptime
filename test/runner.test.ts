@@ -7,7 +7,7 @@ import type { RdapResult } from "../src/checks/domain/rdap.js";
 import { discordPayload, slackPayload, webhookSender } from "../src/alerts.js";
 import { run } from "../src/cli.js";
 import { configFromEnv, jsonSchema, parseConfig, ConfigError } from "../src/config.js";
-import { judge, type Alert } from "../src/judge.js";
+import { alertDetail, judge, type Alert } from "../src/judge.js";
 import { graph, renderPage } from "../src/page.js";
 import { Runner } from "../src/runner.js";
 import { pageServer } from "../src/server.js";
@@ -55,7 +55,7 @@ describe("judging", () => {
       alerts.push(...r.alerts.map((a) => ({ ...a, at: String(i) })));
     }
     expect(alerts.map((a) => `${a.at} ${a.kind}`)).toEqual(["3 down", "5 up"]);
-    expect(alerts[1]!.detail).toBe("Down for 4 minutes, since 00:01 UTC.");
+    expect(alertDetail(alerts[1]!, "utc")).toBe("Down for 4 minutes. Since 00:01 UTC.");
   });
 
   it("announces each expiry threshold once, and again after a renewal", () => {
@@ -76,6 +76,20 @@ describe("alerts", () => {
   it("never mention anyone on Discord, and escape Slack's markup", () => {
     expect(discordPayload(a)).toMatchObject({ allowed_mentions: { parse: [] } });
     expect((slackPayload(a) as { text: string }).text).toContain("&lt;script&gt; &amp; &lt;@here&gt;");
+  });
+
+  it("write a moment in each reader's timezone: Discord and Slack markup, UTC in logs", () => {
+    const up: Alert = { kind: "up", site: "ex", target: "Homepage", title: "Ex: Homepage is back up", detail: "Down for 7 minutes.", when: { at: "2026-11-19T07:32:36.000Z", word: "Since", show: "time" }, url: "https://example.com/", at: "2026-11-19T07:39:36Z" };
+    const unix = Date.parse("2026-11-19T07:32:36.000Z") / 1000;
+    expect(alertDetail(up, "utc")).toBe("Down for 7 minutes. Since 07:32 UTC.");
+    expect((discordPayload(up) as { embeds: Array<{ description: string }> }).embeds[0]!.description).toContain(`Down for 7 minutes. Since <t:${unix}:t>.`);
+    expect((slackPayload(up) as { text: string }).text).toContain(`Since <!date^${unix}^{time}|07:32 UTC>.`);
+    const expiring: Alert = { ...up, kind: "expiring", title: "Ex's TLS certificate expires in 3 days", detail: null, when: { at: "2026-11-22T12:00:00Z", word: "On", show: "date" } };
+    expect(alertDetail(expiring, "utc")).toBe("On 2026-11-22.");
+    expect((discordPayload(expiring) as { embeds: Array<{ description: string }> }).embeds[0]!.description).toContain(`On <t:${Date.parse("2026-11-22T12:00:00Z") / 1000}:D>.`);
+    // The site's words stay escaped on Slack; only our date markup is markup.
+    const hostile: Alert = { ...up, detail: "<!channel> & <x>" };
+    expect((slackPayload(hostile) as { text: string }).text).toContain("&lt;!channel&gt; &amp; &lt;x&gt; Since <!date^");
   });
 
   it("go to each webhook, and never to a URL off its service's hosts", async () => {

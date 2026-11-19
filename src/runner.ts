@@ -5,7 +5,7 @@ import { DEFAULT_CHECKERS, runSpec, type Checkers } from "./checks/spec.js";
 import { siteUrl } from "./checks/url.js";
 import type { Sender } from "./alerts.js";
 import type { Config, Site } from "./config.js";
-import { judge, type Alert, type Outcome } from "./judge.js";
+import { alertDetail, judge, type Alert, type Outcome } from "./judge.js";
 import { newTarget, readState, record, writeState, type State } from "./state.js";
 import { agentTarget, excluded, siteTargets, sitemapTarget, type Target } from "./targets.js";
 
@@ -171,7 +171,7 @@ export class Runner {
       this.next.set(t.key, Date.parse(o.checkedAt) + (retry ?? t.intervalS) * 1000);
       this.out(JSON.stringify({ t: o.checkedAt, site: t.site, check: t.label, url: t.url, ok: o.ok, ...(o.ttfbMs !== null ? { ttfbMs: Math.round(o.ttfbMs) } : {}), ...(o.ok ? {} : { error: o.error, detail: o.detail }) }));
       for (const a of alerts) {
-        this.out(JSON.stringify({ t: a.at, alert: a.kind, site: a.site, title: a.title, ...(a.detail ? { detail: a.detail } : {}) }));
+        this.out(JSON.stringify({ t: a.at, alert: a.kind, site: a.site, title: a.title, ...(alertDetail(a, "utc") ? { detail: alertDetail(a, "utc") } : {}) }));
         await this.o.send(a);
       }
       await this.save();
