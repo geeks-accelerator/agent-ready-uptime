@@ -1,0 +1,22 @@
+{
+  "name": "agent-ready-uptime-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "workspaces": [
+    "packages/checks",
+    "packages/uptime"
+  ],
+  "scripts": {
+    "build": "npm run build -w @geeks-accelerator/agent-ready-checks && npm run build -w agent-ready-uptime",
+    "typecheck": "tsc --noEmit -p packages/checks && tsc --noEmit -p packages/uptime",
+    "test": "npm test -w @geeks-accelerator/agent-ready-checks && npm test -w agent-ready-uptime"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

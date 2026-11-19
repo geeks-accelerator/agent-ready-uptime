@@ -1,0 +1,47 @@
+{
+  "name": "@geeks-accelerator/agent-ready-checks",
+  "version": "0.1.0",
+  "description": "The checks behind agent-ready uptime monitoring: pages with timings and TLS, domain expiry, sitemaps, llms.txt and other agent files, AI crawler access, MCP tool lists and their changes, ports and DNS. Private addresses refused.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "exports": {
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "htmlparser2": "^12.0.0",
+    "saxes": "^6.0.0",
+    "zod": "^4.6.7"
+  },
+  "keywords": [
+    "uptime-monitor",
+    "uptime-monitoring",
+    "website-monitoring",
+    "mcp",
+    "model-context-protocol",
+    "llms-txt",
+    "ai-agents",
+    "agent-readiness",
+    "ai-crawlers",
+    "robots-txt"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geeks-accelerator/agent-ready-uptime.git",
+    "directory": "packages/checks"
+  }
+}

@@ -1,0 +1,45 @@
+# Publishes one package to npm when a GitHub release tagged checks-v<version> or
+# uptime-v<version> is published, through npm trusted publishing (OIDC): no npm token
+# is stored anywhere. After each package's first manual publish, add a trusted
+# publisher on npmjs.com for geeks-accelerator/agent-ready-uptime, workflow release.yml.
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # trusted publishing; only this job gets it
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          check-latest: true
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@12
+      - run: npm ci && npm run build
+      - name: The tag names a package and matches its version
+        id: pkg
+        run: |
+          case "$GITHUB_REF_NAME" in
+            checks-v*) dir=packages/checks; tag="${GITHUB_REF_NAME#checks-v}" ;;
+            uptime-v*) dir=packages/uptime; tag="${GITHUB_REF_NAME#uptime-v}" ;;
+            *) echo "Tag $GITHUB_REF_NAME names no package"; exit 1 ;;
+          esac
+          version="$(node -p "require('./$dir/package.json').version")"
+          [ "$tag" = "$version" ] || { echo "Tag $tag doesn't match $dir's version $version"; exit 1; }
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - run: npm publish --access public
+        working-directory: ${{ steps.pkg.outputs.dir }}
