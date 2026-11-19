@@ -1,7 +1,8 @@
-# Publishes agent-ready-uptime to npm when a GitHub release tagged v<version> is
-# published, through npm trusted publishing (OIDC): no npm token is stored anywhere.
-# After the first manual publish, add a trusted publisher on npmjs.com for
-# geeks-accelerator/agent-ready-uptime, workflow release.yml.
+# Stages agent-ready-uptime on npm when a GitHub release tagged v<version> is published,
+# through npm trusted publishing (OIDC): no npm token is stored anywhere. The trusted
+# publisher (npmjs.com, geeks-accelerator/agent-ready-uptime, workflow release.yml) allows
+# staging only, so a maintainer approves each version before it's live: npmjs.com's
+# Staged Packages tab, or `npm stage approve <stage-id>` (both ask for 2FA).
 name: Release
 
 on:
@@ -35,4 +36,4 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           version="$(node -p "require('./package.json').version")"
           [ "$tag" = "$version" ] || { echo "Release tag v$tag doesn't match package.json version $version"; exit 1; }
-      - run: npm publish --access public
+      - run: npm stage publish

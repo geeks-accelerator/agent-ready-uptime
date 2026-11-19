@@ -22,4 +22,5 @@ Agent-ready uptime monitoring: one npm package, `agent-ready-uptime`, holding th
 
 1. Change `version` in `package.json`; add a CHANGELOG entry.
 2. `npm run typecheck`, `npm test`, then `npx agent-ready-uptime check` against two or three real sites.
-3. Publish a GitHub release tagged `v<version>`: the Release workflow tests and publishes to npm through trusted publishing, and the Image workflow pushes the Docker image.
+3. Publish a GitHub release tagged `v<version>`: the Release workflow tests it and stages it on npm through trusted publishing, and the Image workflow pushes the Docker image.
+4. Approve the staged version on npmjs.com (the package's Staged Packages tab, with 2FA): only then is it live.
