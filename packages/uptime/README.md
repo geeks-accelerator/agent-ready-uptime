@@ -2,6 +2,8 @@
 
 Agent-ready uptime monitoring, open source: uptime, TLS and domain expiry, sitemaps, llms.txt, AI crawler access and MCP tool changes, with alerts to Discord or Slack and a status page.
 
+Made by [Sites in the Woods](https://sitesinthewoods.com), which runs these same checks as a hosted service: every outage confirmed from a second region, 400 days of history, AI agents walking through your site's real tasks, and team dashboards. This is the free part you host yourself.
+
 Most monitors ask whether your homepage answers. This one also watches what AI agents and crawlers meet: your `llms.txt`, agent card, OpenAPI and MCP manifest, whether GPTBot, ClaudeBot and the rest can still get in, and whether your MCP server's tools were renamed, removed or changed shape. An agent that called `adopt` yesterday fails today if it's now `adopt_v2`; this tells you first.
 
 ```bash
