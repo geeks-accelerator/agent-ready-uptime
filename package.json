@@ -10,9 +10,9 @@
     "packages/uptime"
   ],
   "scripts": {
-    "build": "npm run build -w @geeks-accelerator/agent-ready-checks && npm run build -w agent-ready-uptime",
+    "build": "npm run build -w agent-ready-checks && npm run build -w agent-ready-uptime",
     "typecheck": "tsc --noEmit -p packages/checks && tsc --noEmit -p packages/uptime",
-    "test": "npm test -w @geeks-accelerator/agent-ready-checks && npm test -w agent-ready-uptime"
+    "test": "npm test -w agent-ready-checks && npm test -w agent-ready-uptime"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

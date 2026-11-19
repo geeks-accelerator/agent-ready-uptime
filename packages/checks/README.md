@@ -1,11 +1,11 @@
-# @geeks-accelerator/agent-ready-checks
+# agent-ready-checks
 
 The checks behind [agent-ready uptime monitoring](../../README.md): one request at a time, each returning a plain result. Used by `agent-ready-uptime` and by the hosted [Sites in the Woods](https://sitesinthewoods.com), so a fix to a check helps both.
 
 ```ts
-import { checkPage } from "@geeks-accelerator/agent-ready-checks/http/page-check";
-import { checkMcp } from "@geeks-accelerator/agent-ready-checks/mcp/check";
-import { discoverAgentFiles } from "@geeks-accelerator/agent-ready-checks/agent/discover";
+import { checkPage } from "agent-ready-checks/http/page-check";
+import { checkMcp } from "agent-ready-checks/mcp/check";
+import { discoverAgentFiles } from "agent-ready-checks/agent/discover";
 
 const home = await checkPage("https://example.com/", { keyword: "Welcome" });
 console.log(home.ok, home.timings.ttfbMs, home.tls?.validTo);

@@ -95,7 +95,7 @@ It checks from one place (yours), keeps 24 hours, and sends one message per aler
 
 ## The checks package
 
-The checks themselves are [`@geeks-accelerator/agent-ready-checks`](packages/checks), usable on their own. [`readiness-audit`](https://github.com/geeks-accelerator/agent-and-search-readiness) scores a site once against the Agent and Search Readiness Standard; this watches it. The audit tells you once; the monitor tells you when it breaks.
+The checks themselves are [`agent-ready-checks`](packages/checks), usable on their own. [`readiness-audit`](https://github.com/geeks-accelerator/agent-and-search-readiness) scores a site once against the Agent and Search Readiness Standard; this watches it. The audit tells you once; the monitor tells you when it breaks.
 
 ## License
 

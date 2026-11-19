@@ -27,7 +27,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@geeks-accelerator/agent-ready-checks": "0.1.0",
+    "agent-ready-checks": "0.1.0",
     "zod": "^4.6.7"
   },
   "keywords": ["uptime-monitor", "uptime-monitoring", "website-monitoring", "status-page", "self-hosted", "mcp", "model-context-protocol", "llms-txt", "ai-agents", "agent-readiness", "ai-crawlers", "robots-txt", "discord", "slack", "railway"],

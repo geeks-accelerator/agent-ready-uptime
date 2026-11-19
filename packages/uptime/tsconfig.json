@@ -13,7 +13,7 @@
     "types": ["node"],
     "noEmit": true,
     // The checks package from its source in this workspace (the build reads its dist: tsconfig.build.json).
-    "paths": { "@geeks-accelerator/agent-ready-checks/*": ["../checks/src/*.ts"] }
+    "paths": { "agent-ready-checks/*": ["../checks/src/*.ts"] }
   },
   "include": ["src", "test"]
 }

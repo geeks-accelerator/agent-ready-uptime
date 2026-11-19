@@ -4,7 +4,7 @@ Agent-ready uptime monitoring: a checks package and a small runner, in one npm w
 
 ## Layout
 
-- `packages/checks/src`: the checks (`http`, `agent`, `mcp`, `sitemap`, `net`, `domain`, `robots`), the shared judgements (`rules`), a check as data (`spec`), the site config's keys (`config`), webhooks, chart geometry and escaped HTML. Imported by subpath: `@geeks-accelerator/agent-ready-checks/http/page-check`.
+- `packages/checks/src`: the checks (`http`, `agent`, `mcp`, `sitemap`, `net`, `domain`, `robots`), the shared judgements (`rules`), a check as data (`spec`), the site config's keys (`config`), webhooks, chart geometry and escaped HTML. Imported by subpath: `agent-ready-checks/http/page-check`.
 - `packages/uptime/src`: `config` (monitor.config.json), `targets` (a site's checks), `runner` (discovery, the schedule, state), `judge` (what's news), `alerts` (Discord and Slack), `page` and `server` (the status page), `cli`.
 - `packages/*/test`: vitest, against local fake sites only.
 

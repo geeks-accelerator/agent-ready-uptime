@@ -4,7 +4,7 @@ Issues and pull requests are welcome. The runner stays small on purpose: one pla
 
 ## Layout
 
-- `packages/checks` (`@geeks-accelerator/agent-ready-checks`): the code that inspects a site. One request at a time, a plain result back. [Sites in the Woods](https://sitesinthewoods.com) runs on the same package.
+- `packages/checks` (`agent-ready-checks`): the code that inspects a site. One request at a time, a plain result back. [Sites in the Woods](https://sitesinthewoods.com) runs on the same package.
 - `packages/uptime` (`agent-ready-uptime`): the runner. Config, schedule, judging, alerts, state and the status page.
 
 ## Changing a check

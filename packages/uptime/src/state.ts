@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { AgentTargetSpec } from "@geeks-accelerator/agent-ready-checks/agent/discover";
-import { NO_STREAK, type FailureStreak } from "@geeks-accelerator/agent-ready-checks/rules";
+import type { AgentTargetSpec } from "agent-ready-checks/agent/discover";
+import { NO_STREAK, type FailureStreak } from "agent-ready-checks/rules";
 
 /**
  * Everything the runner remembers, in one JSON file: so a restart doesn't alert again,

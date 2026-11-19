@@ -1,5 +1,5 @@
-import { postWithRetries, type SendResult } from "@geeks-accelerator/agent-ready-checks/webhook";
-import { isWebhook } from "@geeks-accelerator/agent-ready-checks/webhook";
+import { postWithRetries, type SendResult } from "agent-ready-checks/webhook";
+import { isWebhook } from "agent-ready-checks/webhook";
 import type { Webhook } from "./config.js";
 import type { Alert, AlertKind } from "./judge.js";
 

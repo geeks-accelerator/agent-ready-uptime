@@ -1,7 +1,7 @@
-import { linePaths, msAxis } from "@geeks-accelerator/agent-ready-checks/chart";
-import { ms } from "@geeks-accelerator/agent-ready-checks/format";
-import { html, raw, safeHref, type Raw } from "@geeks-accelerator/agent-ready-checks/html/template";
-import { daysUntil } from "@geeks-accelerator/agent-ready-checks/rules";
+import { linePaths, msAxis } from "agent-ready-checks/chart";
+import { ms } from "agent-ready-checks/format";
+import { html, raw, safeHref, type Raw } from "agent-ready-checks/html/template";
+import { daysUntil } from "agent-ready-checks/rules";
 import type { Config, Site } from "./config.js";
 import { HISTORY_MS, type HistoryPoint, type State, type TargetState } from "./state.js";
 import type { Target } from "./targets.js";

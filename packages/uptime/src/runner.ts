@@ -1,8 +1,8 @@
-import { discoverAgentFiles } from "@geeks-accelerator/agent-ready-checks/agent/discover";
-import { lookupDomain } from "@geeks-accelerator/agent-ready-checks/domain/rdap";
-import { discoverSitemaps, fetchSitemap } from "@geeks-accelerator/agent-ready-checks/sitemap/fetch";
-import { DEFAULT_CHECKERS, runSpec, type Checkers } from "@geeks-accelerator/agent-ready-checks/spec";
-import { siteUrl } from "@geeks-accelerator/agent-ready-checks/url";
+import { discoverAgentFiles } from "agent-ready-checks/agent/discover";
+import { lookupDomain } from "agent-ready-checks/domain/rdap";
+import { discoverSitemaps, fetchSitemap } from "agent-ready-checks/sitemap/fetch";
+import { DEFAULT_CHECKERS, runSpec, type Checkers } from "agent-ready-checks/spec";
+import { siteUrl } from "agent-ready-checks/url";
 import type { Sender } from "./alerts.js";
 import type { Config, Site } from "./config.js";
 import { judge, type Alert, type Outcome } from "./judge.js";

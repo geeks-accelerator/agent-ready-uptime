@@ -1,5 +1,5 @@
 {
-  "name": "@geeks-accelerator/agent-ready-checks",
+  "name": "agent-ready-checks",
   "version": "0.1.0",
   "description": "The checks behind agent-ready uptime monitoring: pages with timings and TLS, domain expiry, sitemaps, llms.txt and other agent files, AI crawler access, MCP tool lists and their changes, ports and DNS. Private addresses refused.",
   "license": "MIT",
