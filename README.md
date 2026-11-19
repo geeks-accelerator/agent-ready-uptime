@@ -12,7 +12,7 @@ npx agent-ready-uptime init https://your.site
 npx agent-ready-uptime watch
 ```
 
-Then open <http://127.0.0.1:8080/> for the status page. Node 26 or later.
+Then open <http://127.0.0.1:8080/> for the status page. Node 26 or later. Or [deploy it on Railway](https://railway.com/deploy/ozskFo) in a minute.
 
 ## What it checks
 
@@ -81,7 +81,9 @@ docker run -d -p 8080:8080 -e HOST=0.0.0.0 -e SITES=https://example.com \
 
 ### Railway
 
-Deploy the template, set `SITES` and a webhook variable, and the service's public URL is your status page.
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/ozskFo)
+
+Set `SITES` (and, if you like, `DISCORD_WEBHOOK_URL` or `SLACK_WEBHOOK_URL`) and deploy: the service's public URL is your status page. The template runs the published image with a volume for the state file, a health check and restarts.
 
 ## The status page
 
