@@ -23,4 +23,5 @@ Agent-ready uptime monitoring: one npm package, `agent-ready-uptime`, holding th
 1. Change `version` in `package.json`; add a CHANGELOG entry.
 2. `npm run typecheck`, `npm test`, then `npx agent-ready-uptime check` against two or three real sites.
 3. Publish a GitHub release tagged `v<version>`: the Release workflow tests it and stages it on npm through trusted publishing, and the Image workflow pushes the Docker image.
-4. Approve the staged version on npmjs.com (the package's Staged Packages tab, with 2FA): only then is it live.
+4. Approve the staged version: `npm stage list agent-ready-uptime`, then `npm stage approve <stage-id>` (it asks for 2FA in the browser), or the package's Staged Packages tab on npmjs.com where it's available. Only then is it live.
+5. The Railway template ([railway.com/deploy/ozskFo](https://railway.com/deploy/ozskFo), owned by Lee Brown's Projects) runs the image's `latest` tag, so a release reaches it on the next deploy; its variables and volume are edited in Railway's template editor.
