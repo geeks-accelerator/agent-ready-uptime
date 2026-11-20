@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- `check` reports for people: failures first on stderr, each with why, then a count (`All 31 checks passed.`). The JSON lines on stdout are unchanged.
+- In GitHub Actions (`GITHUB_ACTIONS=true`), `check` also writes a table of every check to the run's summary (`$GITHUB_STEP_SUMMARY`, cut past 100 rows with a count) and an `::error` annotation per failure.
+- Exit codes: 0 all passed, 1 a check failed, 2 the run itself failed. A crash now exits 2 (it was 1), so CI can tell a broken run from a failing site.
+- `check` no longer says "No alerts configured" (it never serves a page).
+- The README's CI section: a short workflow, and checking a Vercel preview.
+
 ## 0.3.0
 
 - Generic webhooks: a `webhook` alert kind posts each alert as versioned JSON to any public HTTPS endpoint, signed by [Standard Webhooks](https://www.standardwebhooks.com/). Config: `{ "kind": "webhook", "env": "WEBHOOK_URL", "secretEnv": "WEBHOOK_SECRET" }`, or `WEBHOOK_URL` and `WEBHOOK_SECRET` beside `SITES`; `agent-ready-uptime secret` prints a new secret.

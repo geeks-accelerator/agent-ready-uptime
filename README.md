@@ -70,8 +70,46 @@ No file? `SITES=https://a.example,https://b.example` with `DISCORD_WEBHOOK_URL`,
 ## Running it
 
 - `watch`: checks on schedule, serves the status page (`--port`, default 8080 or `PORT`; `--host`, default 127.0.0.1 or `HOST`; `--no-page`), and prints one JSON line per check and per alert.
-- `check`: one pass of every check, then exits 1 if anything is failing, 0 if not. With the same `--state` file it's a whole monitor from cron or a scheduled GitHub Action: a failure still has to repeat before it alerts, and a recovery still says so.
+- `check`: one pass of every check. Failures are listed first on stderr, each with why, then a count. It exits **0** when everything passed, **1** when a check failed, and **2** when the run itself failed (bad arguments or config, a crash), so a build can retry a broken run without hiding a real failure. With the same `--state` file it's a whole monitor from cron or a scheduled GitHub Action: a failure still has to repeat before it alerts, and a recovery still says so.
 - State lives in `.agent-ready-uptime/state.json` (`--state`, or `STATE_PATH`): last results, MCP tool lists and DNS records, and the graph's last 24 hours. A restart picks up where it left off without alerting again.
+
+### In CI
+
+Stop a deploy when the site is down, `llms.txt` is gone, an AI crawler is newly refused or an MCP server's tools changed:
+
+```yaml
+name: Site checks
+on: [push]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: 26 }
+      - run: npx agent-ready-uptime@0.4.0 check
+        env: { SITES: "https://example.com" }
+```
+
+In GitHub Actions, `check` also writes a table of every check to the run's summary page and marks each failure on the run (`::error`), with no flag to set.
+
+To check a preview before it goes live, run it after the deployment and pass the preview's URL. On Vercel, a [`repository_dispatch`](https://vercel.com/guides/how-can-i-run-end-to-end-tests-after-my-vercel-preview-deployment) on `vercel.deployment.success` carries it:
+
+```yaml
+on:
+  repository_dispatch:
+    types: [vercel.deployment.success]
+jobs:
+  check:
+    if: github.event.client_payload.environment == 'preview'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: 26 }
+      - run: npx agent-ready-uptime@0.4.0 check
+        env: { SITES: "${{ github.event.client_payload.url }}" }
+```
+
+A preview's robots.txt and agent files often differ from production on purpose (previews are usually kept out of search), so check the files that matter there, or check production right after it deploys.
 
 ### Docker
 

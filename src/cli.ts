@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import { webhookSender } from "./alerts.js";
 import { newWebhookSecret } from "./checks/webhook.js";
 import { ConfigError, configFromEnv, jsonSchema, loadConfig, parseConfig, type Config, type Webhook } from "./config.js";
+import { report } from "./report.js";
 import { Runner } from "./runner.js";
 import { pageServer } from "./server.js";
 import { TITLE } from "./page.js";
@@ -12,7 +13,8 @@ const USAGE = `${TITLE}
 
 Usage:
   agent-ready-uptime watch   [--config FILE] [--state FILE] [--port 8080] [--host 127.0.0.1] [--no-page]
-  agent-ready-uptime check   [--config FILE] [--state FILE]     one pass; exit 1 if anything is failing
+  agent-ready-uptime check   [--config FILE] [--state FILE]     one pass: exit 0 all passed, 1 a check failed,
+                                                                2 the run itself failed (arguments, config, a crash)
   agent-ready-uptime init    <https://your.site> [more sites]   write monitor.config.json
   agent-ready-uptime schema                                     print the config's JSON schema
   agent-ready-uptime secret                                     print a new signing secret for a webhook
@@ -37,7 +39,8 @@ async function config(path: string | undefined): Promise<{ config: Config; webho
 }
 
 /**
- * Run a command. Resolves with the exit code (check: 1 while anything fails), or null
+ * Run a command. Resolves with the exit code (check: 1 while anything fails; 2 for a usage or
+ * config problem, and bin.ts exits 2 on a crash), or null
  * for watch, which keeps running until SIGTERM or SIGINT.
  */
 export async function run(argv: string[]): Promise<number | null> {
@@ -91,12 +94,13 @@ async function command(argv: string[]): Promise<number | null> {
   const { config: cfg, webhooks } = await config(values.config);
   const statePath = values.state ?? process.env.STATE_PATH ?? ".agent-ready-uptime/state.json";
   const runner = await Runner.open(cfg, { statePath, send: webhookSender(webhooks) });
-  if (!webhooks.length) process.stderr.write("No alerts configured: problems are only logged and shown on the page.\n");
+  if (!webhooks.length && command === "watch") process.stderr.write("No alerts configured: problems are only logged and shown on the page.\n");
 
   if (command === "check") {
     await runner.discover(true);
     await runner.checkAll();
     await runner.stop();
+    await report(runner);
     return runner.failing().length ? 1 : 0;
   }
 

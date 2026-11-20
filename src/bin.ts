@@ -10,6 +10,7 @@ run(process.argv.slice(2)).then(
   },
   (e) => {
     process.stderr.write(`${(e as Error).stack ?? String(e)}\n`);
-    exit(1);
+    // 2, not 1: a crash is the run failing, never a check failing (CI can retry it).
+    exit(2);
   },
 );
