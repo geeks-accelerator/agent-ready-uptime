@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- `checks/domain/registration`: `judgeRegistration(before, after, at)` says what a domain's registration change means. A date that moved forward before the old expiry is a renewal (`"seen"`). One that moved after expiry, or with the `auto renew period` status, is only the registry's own renewal (`"registry"`): for .com, .net and most gTLDs the registry renews the day after expiry whether or not the registrar was paid, and the registrar may then park the site. It also returns `unpaid` (that status), `bad` (holds, redemption, pending delete), `locks` (removed and added) and `parked` (nameservers just moved to a parking host, `PARKING_NS`).
+- The runner's domain check alerts on those: expired and only the registry renewed it, a new registry status problem, a registrar lock removed, nameservers moved to a parking host. Before, a domain renewed only by the registry reset its expiry reminders silently.
+- `lookupDomain` sets `noRdap` when the TLD's registry has no RDAP service (.io, .co, .me…), and the check says so.
+
 ## 0.5.0
 
 - `measureHtml` counts two more parts of a page's HTML: `inlineStyleBytes` (inside `<style>` and in `style=""` attributes) and `imageMarkupBytes` (the `<img>`, `<picture>` and `<source>` tags themselves, `srcset` and `sizes` included), on the parse it already makes. A heavy page is usually one of these, inline scripts and data, or inline SVG.

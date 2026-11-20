@@ -2,6 +2,7 @@ import { FINGERPRINT_VERSION } from "./checks/mcp/check.js";
 import { describeToolChange } from "./checks/mcp/diff.js";
 import { describeRecordChange } from "./checks/net/dns.js";
 import { addFailure, bucketFor, daysUntil, DOMAIN_BUCKETS, isDown, NO_STREAK, SSL_BUCKETS } from "./checks/rules.js";
+import { judgeRegistration, type RegistrationState } from "./checks/domain/registration.js";
 import type { TargetState } from "./state.js";
 import type { Target } from "./targets.js";
 
@@ -17,6 +18,8 @@ export interface Outcome {
   /** A certificate's or a domain's expiry. */
   expiresAt?: string | null | undefined;
   count?: number | undefined;
+  /** A domain's registration as RDAP read it (statuses and nameservers too). */
+  registration?: RegistrationState | undefined;
 }
 
 export type AlertKind = "down" | "up" | "failing" | "recovered" | "changed" | "expiring";
@@ -92,6 +95,19 @@ export function judge(t: Target, before: TargetState, o: Outcome, siteName: stri
     if (before.fingerprint && before.fingerprint !== o.fingerprint && sameRecipe) s.changedAt = o.checkedAt;
     s.fingerprint = o.fingerprint;
     s.fingerprintData = o.fingerprintData;
+  }
+
+  // A domain's registration: what changed since the last reading (judgeRegistration, shared with the
+  // hosted monitor). New trouble alerts once; a date moved by the registry's own renewal is never a renewal.
+  if (o.registration) {
+    const j = judgeRegistration(before.registration ?? null, o.registration, Date.parse(o.checkedAt));
+    const was = before.registration ? judgeRegistration(null, before.registration, Date.parse(o.checkedAt)) : null;
+    if (j.unpaid && !was?.unpaid) alert("failing", `${siteName}: ${t.label} expired and may not have been paid for`, "The registry renewed it automatically, but the registrar may not have been paid: the site can be parked at any time. Renew it at the registrar.");
+    const newBad = j.bad.filter((f) => !was?.bad.includes(f));
+    if (newBad.length) alert("failing", `${siteName}: ${t.label} has a registry status problem`, `Registry status: ${newBad.join(", ")}.`);
+    if (j.locks.removed.length) alert("changed", `${siteName}: ${t.label}'s registrar lock was removed`, `Removed: ${j.locks.removed.join(", ")}. The nameservers or the registrar can now be changed; if nobody meant to, lock it again.`);
+    if (j.parked.length) alert("failing", `${siteName}: ${t.label}'s nameservers moved to a parking host`, `Now: ${j.parked.join(", ")}. The domain has likely lapsed at the registrar.`);
+    s.registration = o.registration;
   }
 
   // A certificate (the homepage's) or the domain's registration running out: each threshold once, again after a renewal.

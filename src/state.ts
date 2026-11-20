@@ -1,3 +1,4 @@
+import type { RegistrationState } from "./checks/domain/registration.js";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AgentTargetSpec } from "./checks/agent/discover.js";
@@ -30,6 +31,8 @@ export interface TargetState {
   announcedBucket?: number | null;
   /** MCP: how many tools it lists. */
   count?: number;
+  /** A domain: its last registration reading (expiry, statuses, nameservers), to judge the next against. */
+  registration?: RegistrationState;
 }
 
 export interface SiteDiscovery {

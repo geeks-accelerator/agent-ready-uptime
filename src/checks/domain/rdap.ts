@@ -18,6 +18,8 @@ export interface RdapResult {
   registrar: string | null;
   nameservers: string[];
   statusFlags: string[];
+  /** The TLD's registry has no RDAP service in IANA's bootstrap (e.g. .io, .co, .me): its expiry can't be read this way. */
+  noRdap?: boolean;
 }
 
 /** RDAP statuses that mean the domain is (about to be) out of service. */
@@ -45,6 +47,7 @@ export async function lookupDomain(domain: string): Promise<RdapResult> {
     const base = await rdapBase(tld);
     if (!base) {
       result.error = `no RDAP server for .${tld}`;
+      result.noRdap = true;
       return result;
     }
     const res = await fetchUrl(`${base}/domain/${encodeURIComponent(domain)}`, {

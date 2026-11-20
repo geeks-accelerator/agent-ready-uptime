@@ -190,7 +190,15 @@ export class Runner {
     }
     if (t.kind === "domain") {
       const r = await this.deps.lookupDomain(t.url);
-      return { ok: r.ok, checkedAt: checkedAt(), error: r.error, detail: r.ok ? null : `RDAP lookup failed: ${r.error}`, ttfbMs: null, expiresAt: r.expiresAt };
+      return {
+        ok: r.ok,
+        checkedAt: checkedAt(),
+        error: r.error,
+        detail: r.ok ? null : r.noRdap ? `Can't read this domain's registration: its registry has no RDAP service.` : `RDAP lookup failed: ${r.error}`,
+        ttfbMs: null,
+        expiresAt: r.expiresAt,
+        ...(r.ok ? { registration: { expiresAt: r.expiresAt, statusFlags: r.statusFlags, nameservers: r.nameservers } } : {}),
+      };
     }
     const r = await runSpec(t.spec!, this.deps.checkers);
     return {

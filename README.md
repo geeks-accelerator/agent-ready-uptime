@@ -22,7 +22,7 @@ For each site, with no configuration beyond its URL:
 |---|---|---|
 | The homepage (status, keyword, final URL; first-byte time) | every minute | it fails three times in a row (retried after 1 minute, then 5), and when it's back |
 | The TLS certificate | with the homepage | 14 and 3 days before it expires |
-| The domain's registration (RDAP) | daily | 30, 14, 7 and 1 days before it expires |
+| The domain's registration (RDAP) | daily | 30, 14, 7 and 1 days before it expires; when it expired and only the registry renewed it (the registrar may not have been paid); a hold, redemption or pending delete; a registrar lock removed; nameservers moved to a parking host |
 | Sitemaps (from robots.txt, `/sitemap.xml`, `/sitemap.json`) | every 30 minutes | one stops parsing or lists fewer URLs than `minUrls` |
 | Agent files: `llms.txt`, agent card, OpenAPI, MCP manifest, `robots.txt`, `security.txt` | hourly | one that was valid stops being valid (an HTML fallback served as `llms.txt` fails) |
 | The MCP server (from `/.well-known/mcp.json`, or configured) | hourly | the handshake fails, or its tools change: "removed `adopt`; added `adopt_v2`" |
@@ -160,7 +160,8 @@ Each module is `agent-ready-uptime/checks/<module>`:
 | `mcp/check`, `mcp/diff` | an MCP handshake and tool list, fingerprinted; what changed between two lists |
 | `sitemap/fetch`, `sitemap/parse` | discover, fetch and parse XML, news and JSON sitemaps and indexes, gzip included, with size caps |
 | `net/port`, `net/dns` | a TCP (and TLS) port check; a record set asked of the zone's own nameservers |
-| `domain/rdap` | a domain's expiry, registrar and status from RDAP |
+| `domain/rdap` | a domain's expiry, registrar and status from RDAP (`noRdap` when its registry has no RDAP service) |
+| `domain/registration` | what a registration change means (`judgeRegistration`): a renewal the registrar made, or only the registry's own after expiry; bad statuses, removed locks, parking nameservers |
 | `robots` | robots.txt parsed by RFC 9309 with Google's precedence; what each AI crawler may read |
 | `spec` | a check as data (`CheckSpec`), run by `runSpec`, validated by `specSchema` |
 | `rules` | when a failure is news (three in a row for a page) and when an expiry is announced |
