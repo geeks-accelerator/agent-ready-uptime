@@ -8,12 +8,27 @@
  */
 import { hostOf, isHttpUrl } from "../url.js";
 
-export type AgentFileKind = "llms_txt" | "agent_card" | "openapi" | "mcp_manifest" | "robots_txt" | "security_txt";
+export type AgentFileKind =
+  | "llms_txt" | "agent_card" | "openapi" | "mcp_manifest" | "robots_txt" | "security_txt"
+  | "api_catalog" | "skills_index" | "ai_catalog" | "mcp_server_card";
 
-export const AGENT_FILE_KINDS: readonly AgentFileKind[] = ["llms_txt", "agent_card", "openapi", "mcp_manifest", "robots_txt", "security_txt"];
+/** Every kind a target can expect, or a config can name. */
+export const AGENT_FILE_KINDS: readonly AgentFileKind[] = ["llms_txt", "agent_card", "openapi", "mcp_manifest", "robots_txt", "security_txt", "api_catalog", "skills_index", "ai_catalog", "mcp_server_card"];
+
+/**
+ * The newer files (an API catalog, an agent skills index, an AI catalog, an MCP server card): still
+ * settling as standards, so discovery reads them only when asked (`kinds`), and a check can grade them.
+ */
+export const EMERGING_FILE_KINDS: readonly AgentFileKind[] = ["api_catalog", "skills_index", "ai_catalog", "mcp_server_card"];
+
+/** What discovery looks for by default: the settled files. */
+export const DISCOVERED_FILE_KINDS: readonly AgentFileKind[] = AGENT_FILE_KINDS.filter((k) => !EMERGING_FILE_KINDS.includes(k));
 
 /** Names for the files, and the targets discovery makes from them, wherever they're shown (the dashboard, the try-it scan). */
-export const AGENT_FILE_LABELS: Record<string, string> = { llms_txt: "llms.txt", agent_card: "Agent card", openapi: "OpenAPI", mcp_manifest: "MCP manifest", mcp: "MCP server", robots_txt: "robots.txt", security_txt: "security.txt", crawler: "Crawler probe" };
+export const AGENT_FILE_LABELS: Record<string, string> = {
+  llms_txt: "llms.txt", agent_card: "Agent card", openapi: "OpenAPI", mcp_manifest: "MCP manifest", mcp: "MCP server", robots_txt: "robots.txt", security_txt: "security.txt", crawler: "Crawler probe",
+  api_catalog: "API catalog", skills_index: "Agent skills index", ai_catalog: "AI catalog", mcp_server_card: "MCP server card",
+};
 
 /** Well-known locations, probed during discovery. */
 export const AGENT_FILE_PATHS: Record<AgentFileKind, string> = {
@@ -23,7 +38,18 @@ export const AGENT_FILE_PATHS: Record<AgentFileKind, string> = {
   mcp_manifest: "/.well-known/mcp.json",
   robots_txt: "/robots.txt",
   security_txt: "/.well-known/security.txt",
+  // RFC 9727.
+  api_catalog: "/.well-known/api-catalog",
+  // Agent skills discovery (agentskills.io).
+  skills_index: "/.well-known/agent-skills/index.json",
+  // The AI catalog; some sites publish the same document as /.well-known/ard.json.
+  ai_catalog: "/.well-known/ai-catalog.json",
+  // MCP server cards (SEP-1649).
+  mcp_server_card: "/.well-known/mcp/server-card.json",
 };
+
+/** Other places a file is published under: tried in order when the first answers not found. */
+export const AGENT_FILE_ALTERNATES: Partial<Record<AgentFileKind, string[]>> = { ai_catalog: ["/.well-known/ard.json"] };
 
 /**
  * Why a file failed, as a closed code: the try-it scan's public page shows only our own
@@ -31,7 +57,8 @@ export const AGENT_FILE_PATHS: Record<AgentFileKind, string> = {
  */
 export type AgentFileReason =
   | "html_fallback" | "wrong_type" | "no_title" | "too_short" | "not_json" | "no_name" | "no_url" | "off_site"
-  | "no_version" | "no_paths" | "no_endpoint" | "bad_endpoint" | "no_contact" | "expires_count" | "bad_expires";
+  | "no_version" | "no_paths" | "no_endpoint" | "bad_endpoint" | "no_contact" | "expires_count" | "bad_expires"
+  | "no_linkset" | "no_skills" | "no_entries";
 
 export interface AgentFileVerdict {
   /** Machine-readable failure (null when valid). */
@@ -68,6 +95,14 @@ export function validateAgentFile(kind: AgentFileKind, body: string, contentType
       return ok("robots.txt");
     case "security_txt":
       return securityTxt(body);
+    case "api_catalog":
+      return apiCatalog(body);
+    case "skills_index":
+      return skillsIndex(body);
+    case "ai_catalog":
+      return aiCatalog(body);
+    case "mcp_server_card":
+      return mcpServerCard(body, url);
   }
 }
 
@@ -137,15 +172,81 @@ function openapi(body: string): AgentFileVerdict {
 function mcpManifest(body: string, url: string): AgentFileVerdict {
   const o = json(body);
   if (!o) return bad("mcp_manifest", "not_json", "not a JSON object");
-  const remotes = Array.isArray(o.remotes) ? (o.remotes as Array<Record<string, unknown>>) : [];
-  const endpoint = typeof o.endpoint === "string" ? o.endpoint : remotes.map((r) => r.url).find((u): u is string => typeof u === "string");
-  if (!endpoint) return bad("mcp_manifest", "no_endpoint", "names no endpoint (endpoint or remotes[].url)");
+  return mcpEndpointOf("mcp_manifest", o, url);
+}
+
+/** An MCP manifest's or server card's endpoint: `endpoint`, else the first `remotes[].url`. */
+function mcpEndpointOf(kind: "mcp_manifest" | "mcp_server_card", o: Record<string, unknown>, url: string): AgentFileVerdict {
+  const remotes = Array.isArray(o.remotes) ? (o.remotes as Array<Record<string, unknown> | null>) : [];
+  const endpoint = typeof o.endpoint === "string" ? o.endpoint : remotes.map((r) => r?.url).find((u): u is string => typeof u === "string");
+  if (!endpoint) return bad(kind, "no_endpoint", "names no endpoint (endpoint or remotes[].url)");
   let abs: string;
   try {
     abs = new URL(endpoint, url).toString();
   } catch {
-    return bad("mcp_manifest", "bad_endpoint", `endpoint "${endpoint}" isn't a URL`);
+    return bad(kind, "bad_endpoint", `endpoint "${endpoint}" isn't a URL`);
   }
-  if (!isHttpUrl(abs)) return bad("mcp_manifest", "bad_endpoint", `endpoint "${endpoint}" isn't an http(s) URL`);
+  if (!isHttpUrl(abs)) return bad(kind, "bad_endpoint", `endpoint "${endpoint}" isn't an http(s) URL`);
   return ok(`MCP at ${sameSite(abs, url) ? new URL(abs).pathname : abs}`, { mcpEndpoint: abs });
+}
+
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const objects = (v: unknown): Array<Record<string, unknown>> => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x)) : []);
+
+/** An API catalog (RFC 9727): a linkset with at least one context that has an anchor. */
+function apiCatalog(body: string): AgentFileVerdict {
+  const o = json(body);
+  if (!o) return bad("api_catalog", "not_json", "not a JSON object");
+  const anchors = objects(o.linkset).filter((l) => typeof l.anchor === "string" && l.anchor);
+  if (!anchors.length) return bad("api_catalog", "no_linkset", "no linkset entries with an anchor (RFC 9727)");
+  return ok(count(anchors.length, "entry", "entries"));
+}
+
+/** An agent skills index: a list of skills, each named. */
+function skillsIndex(body: string): AgentFileVerdict {
+  const o = json(body);
+  if (!o) return bad("skills_index", "not_json", "not a JSON object");
+  const skills = objects(o.skills).filter((x) => typeof x.name === "string" && x.name);
+  if (!skills.length) return bad("skills_index", "no_skills", "lists no named skills");
+  return ok(count(skills.length, "skill"));
+}
+
+/** An AI catalog: at least one entry. */
+function aiCatalog(body: string): AgentFileVerdict {
+  const o = json(body);
+  if (!o) return bad("ai_catalog", "not_json", "not a JSON object");
+  const entries = objects(o.entries);
+  if (!entries.length) return bad("ai_catalog", "no_entries", "lists no entries");
+  return ok(count(entries.length, "entry", "entries"));
+}
+
+/** An MCP server card: a name and an endpoint. */
+function mcpServerCard(body: string, url: string): AgentFileVerdict {
+  const o = json(body);
+  if (!o) return bad("mcp_server_card", "not_json", "not a JSON object");
+  if (typeof o.name !== "string" || !o.name) return bad("mcp_server_card", "no_name", "missing name");
+  return mcpEndpointOf("mcp_server_card", o, url);
+}
+
+/**
+ * The links in an llms.txt that stay on its own site (`www.` folded), absolute, deduplicated and
+ * without fragments, in order, at most `max`: what a check reads to see that they answer.
+ */
+export function llmsTxtLinks(body: string, url: string, max = 10): string[] {
+  const out: string[] = [];
+  // Bounded: a link's target is at most 2,000 characters and holds no spaces or brackets.
+  for (const m of body.slice(0, 256 * 1024).matchAll(/\]\(\s{0,4}<?([^\s()<>]{1,2000})>?(?:\s{1,4}"[^"\n]{0,300}")?\s{0,4}\)/g)) {
+    let abs: string;
+    try {
+      const u = new URL(m[1]!, url);
+      u.hash = "";
+      abs = u.toString();
+    } catch {
+      continue;
+    }
+    if (!isHttpUrl(abs) || !sameSite(abs, url) || out.includes(abs)) continue;
+    out.push(abs);
+    if (out.length >= max) break;
+  }
+  return out;
 }

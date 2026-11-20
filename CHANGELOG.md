@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Four newer agent files can be checked: an API catalog (RFC 9727, `/.well-known/api-catalog`), an agent skills index (`/.well-known/agent-skills/index.json`), an AI catalog (`/.well-known/ai-catalog.json`, or `/.well-known/ard.json`) and an MCP server card (`/.well-known/mcp/server-card.json`). Each has a validator, a label and a path; `discoverAgentFiles` reads them when asked (`kinds`), and by default still reads only the settled files (`DISCOVERED_FILE_KINDS`), so a running monitor makes no new requests.
+- `llmsTxtLinks`: an llms.txt's links on its own site, for checking that they answer.
+- `organizationFacts`: what a page's structured data says about who runs the site (a name, description, logo, `sameAs` profiles, a contact), as closed facts.
+
 ## 0.1.2
 
 - Times in alerts show in each reader's own timezone: a recovery's "Since" and an expiry's "On" use Discord's `<t:…>` and Slack's `<!date^…>` (Slack falls back to UTC text). Logs still say UTC.

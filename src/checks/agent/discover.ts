@@ -2,7 +2,7 @@ import { checkPage, type PageCheckResult } from "../http/page-check.js";
 import type { RequestProfile } from "../http/request.js";
 import { siteUrl } from "../url.js";
 import { CRAWLER_PROBES, probeUrl, type Crawler } from "../robots.js";
-import { AGENT_FILE_KINDS, AGENT_FILE_PATHS, validateAgentFile, type AgentFileKind } from "./validate.js";
+import { AGENT_FILE_ALTERNATES, AGENT_FILE_PATHS, DISCOVERED_FILE_KINDS, validateAgentFile, type AgentFileKind } from "./validate.js";
 
 export interface AgentTargetSpec {
   url: string;
@@ -25,7 +25,7 @@ export interface DiscoverOptions {
   robotsPaths?: string[];
   /** Each file's size cap (default `checkPage`'s). */
   maxBytes?: number;
-  /** Which files to look for (default all, in `AGENT_FILE_KINDS` order). */
+  /** Which files to look for (default the settled ones, `DISCOVERED_FILE_KINDS`, in that order). */
   kinds?: readonly AgentFileKind[];
 }
 
@@ -44,17 +44,25 @@ export async function discoverAgentFiles(
   const notes: string[] = [];
   const files: Array<{ kind: AgentFileKind; url: string; result: PageCheckResult }> = [];
   let mcp = opts.mcp ?? null;
-  for (const kind of opts.kinds ?? AGENT_FILE_KINDS) {
-    const url = opts.paths?.[kind] ?? siteUrl(baseUrl, AGENT_FILE_PATHS[kind]);
-    const r = await checkPage(url, {
-      expect: kind,
-      seoChecks: false,
-      timeoutMs: opts.timeoutMs ?? 10_000,
-      ...(opts.profile ? { profile: opts.profile } : {}),
-      ...(opts.sameHost ? { sameHost: true } : {}),
-      ...(opts.maxBytes ? { maxBytes: opts.maxBytes } : {}),
-      ...(kind === "robots_txt" && opts.robotsPaths ? { robotsPaths: opts.robotsPaths } : {}),
-    });
+  for (const kind of opts.kinds ?? DISCOVERED_FILE_KINDS) {
+    const read = (u: string) =>
+      checkPage(u, {
+        expect: kind,
+        seoChecks: false,
+        timeoutMs: opts.timeoutMs ?? 10_000,
+        ...(opts.profile ? { profile: opts.profile } : {}),
+        ...(opts.sameHost ? { sameHost: true } : {}),
+        ...(opts.maxBytes ? { maxBytes: opts.maxBytes } : {}),
+        ...(kind === "robots_txt" && opts.robotsPaths ? { robotsPaths: opts.robotsPaths } : {}),
+      });
+    let url = opts.paths?.[kind] ?? siteUrl(baseUrl, AGENT_FILE_PATHS[kind]);
+    let r = await read(url);
+    // A file some sites publish under another name (the AI catalog as ard.json): tried only when the first isn't there.
+    for (const alt of opts.paths?.[kind] ? [] : (AGENT_FILE_ALTERNATES[kind] ?? [])) {
+      if (r.statusCode !== 404 && r.statusCode !== 410) break;
+      url = siteUrl(baseUrl, alt);
+      r = await read(url);
+    }
     files.push({ kind, url, result: r });
     if (!r.ok) {
       notes.push(`${url}: ${r.errorDetail ?? r.error}`);

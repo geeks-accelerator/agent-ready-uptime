@@ -146,17 +146,19 @@ export function metaKeyLabel(k: string): string {
   return k.startsWith("type:") ? `structured data ${k.slice(5)}` : k;
 }
 
-/** Every JSON-LD block, head or body: its @types (inside @graph and arrays too) and how many don't parse. */
-export function jsonLd(html: string): { types: string[]; invalid: number } {
-  const types = new Set<string>();
+/**
+ * Every JSON-LD block, head or body, parsed: `each` gets each node (inside @graph and arrays too),
+ * and the count of blocks that don't parse is returned.
+ */
+function eachLdNode(html: string, each: (o: Record<string, unknown>) => void): number {
   let invalid = 0;
-  const collect = (v: unknown): void => {
-    if (Array.isArray(v)) return v.forEach(collect);
+  const collect = (v: unknown, depth: number): void => {
+    if (depth > 8) return;
+    if (Array.isArray(v)) return v.forEach((x) => collect(x, depth + 1));
     if (!v || typeof v !== "object") return;
     const o = v as Record<string, unknown>;
-    const t = o["@type"];
-    for (const x of Array.isArray(t) ? t : [t]) if (typeof x === "string" && x) types.add(x);
-    if (o["@graph"]) collect(o["@graph"]);
+    each(o);
+    if (o["@graph"]) collect(o["@graph"], depth + 1);
   };
   // Found with indexOf, not one regex over the page: `<script\b[^>]*…` backtracks over every
   // unclosed `<script` (a 1 MB page of them took minutes). Each step moves past what it read.
@@ -171,14 +173,52 @@ export function jsonLd(html: string): { types: string[]; invalid: number } {
     if (close === -1) break;
     if (/type\s{0,8}=\s{0,8}["']?application\/ld\+json["'\s/]?/.test(lower.slice(i, open + 1))) {
       try {
-        collect(JSON.parse(html.slice(open + 1, close).trim().replace(/^<!--|-->$/g, "")));
+        collect(JSON.parse(html.slice(open + 1, close).trim().replace(/^<!--|-->$/g, "")), 0);
       } catch {
         invalid++;
       }
     }
     i = close + 9;
   }
+  return invalid;
+}
+
+const typesOf = (o: Record<string, unknown>): string[] => (Array.isArray(o["@type"]) ? o["@type"] : [o["@type"]]).filter((x): x is string => typeof x === "string" && x !== "");
+
+/** Every JSON-LD block, head or body: its @types (inside @graph and arrays too) and how many don't parse. */
+export function jsonLd(html: string): { types: string[]; invalid: number } {
+  const types = new Set<string>();
+  const invalid = eachLdNode(html, (o) => typesOf(o).forEach((t) => types.add(t)));
   return { types: [...types].sort(), invalid };
+}
+
+/** What a page's structured data says about who runs the site: closed facts, never the values themselves. */
+export interface OrganizationFacts {
+  /** An Organization (or a kind of one: Corporation, LocalBusiness, NGO, NewsMediaOrganization…). */
+  found: boolean;
+  name: boolean;
+  description: boolean;
+  logo: boolean;
+  /** Profiles elsewhere (`sameAs`), counted. */
+  sameAs: number;
+  /** A way to reach it: email, telephone or a contactPoint. */
+  contact: boolean;
+}
+
+const ORG_TYPES = new Set(["Organization", "Corporation", "LocalBusiness", "NGO", "EducationalOrganization", "GovernmentOrganization", "NewsMediaOrganization", "OnlineBusiness", "OnlineStore", "Store", "SportsOrganization", "MedicalOrganization", "PerformingGroup", "Project", "ResearchOrganization", "WorkersUnion", "Consortium", "FundingScheme", "LibrarySystem", "Airline", "Cooperative"]);
+const filled = (v: unknown) => (typeof v === "string" ? v.trim() !== "" : !!v && typeof v === "object");
+
+/** The page's Organization in structured data: the first one found, or the one that says the most. */
+export function organizationFacts(html: string): OrganizationFacts {
+  let best: OrganizationFacts = { found: false, name: false, description: false, logo: false, sameAs: 0, contact: false };
+  const size = (f: OrganizationFacts) => +f.name + +f.description + +f.logo + +(f.sameAs > 0) + +f.contact;
+  eachLdNode(html, (o) => {
+    if (!typesOf(o).some((t) => ORG_TYPES.has(t) || t.endsWith("Organization"))) return;
+    const sameAs = Array.isArray(o.sameAs) ? o.sameAs.filter((x) => typeof x === "string").length : typeof o.sameAs === "string" ? 1 : 0;
+    const f: OrganizationFacts = { found: true, name: filled(o.name), description: filled(o.description), logo: filled(o.logo), sameAs, contact: filled(o.email) || filled(o.telephone) || filled(o.contactPoint) };
+    if (!best.found || size(f) > size(best)) best = f;
+  });
+  return best;
 }
 
 /** True when an X-Robots-Tag header value blocks indexing. */
