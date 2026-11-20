@@ -1,5 +1,5 @@
-import { postWithRetries, type SendResult } from "./checks/webhook.js";
-import { isWebhook } from "./checks/webhook.js";
+import { randomUUID } from "node:crypto";
+import { isWebhook, postWithRetries, publicFetch, WEBHOOK_LABEL, webhookHeaders, type SendResult } from "./checks/webhook.js";
 import type { Webhook } from "./config.js";
 import { alertDetail, type Alert, type AlertKind } from "./judge.js";
 
@@ -34,6 +34,15 @@ function slackDetail(a: Alert, esc: (s: string) => string): string | null {
   return alertDetail(escaped, "slack");
 }
 
+/**
+ * A generic webhook's body: the alert as JSON, versioned. The title and detail are the
+ * alert's own words, which can quote a site (a page's title, an error), so they're data
+ * for the receiver to escape, never markup.
+ */
+export function webhookPayload(a: Alert, id: string): Record<string, unknown> {
+  return { type: `alert.${a.kind}`, version: 1, id, at: a.at, kind: a.kind, site: a.site, target: a.target, title: a.title, detail: a.detail, ...(a.when ? { when: a.when } : {}), url: a.url };
+}
+
 export interface Sender {
   (a: Alert): Promise<void>;
 }
@@ -47,8 +56,16 @@ export function webhookSender(webhooks: Webhook[], o: { fetchImpl?: typeof fetch
       webhooks.map(async (w) => {
         // Checked again before every post (the config was checked on load): a URL never goes anywhere else.
         if (!isWebhook(w.kind, w.url)) return warn(`${w.kind}: not a ${w.kind} webhook URL; skipped`);
+        if (w.kind === "webhook") {
+          // Signed (Standard Webhooks), and posted through publicFetch: any host, never a private address.
+          const id = `msg_${randomUUID()}`;
+          const body = JSON.stringify(webhookPayload(a, id));
+          const r: SendResult = await postWithRetries("Webhook", o.fetchImpl ?? publicFetch, sleep, w.url, () => ({ body, headers: { ...webhookHeaders(w.secret!, id, body), "user-agent": "agent-ready-uptime-webhooks/1" } }), 15_000, warn);
+          if (r !== "ok") warn(`webhook: alert not delivered (${r === "failed" ? "unreachable" : r.rejected})`);
+          return;
+        }
         const body = JSON.stringify(w.kind === "discord" ? discordPayload(a) : slackPayload(a));
-        const r: SendResult = await postWithRetries(w.kind === "discord" ? "Discord" : "Slack", o.fetchImpl ?? fetch, sleep, w.url, () => ({ body, headers: { "content-type": "application/json" } }), 15_000, warn);
+        const r: SendResult = await postWithRetries(WEBHOOK_LABEL[w.kind], o.fetchImpl ?? fetch, sleep, w.url, () => ({ body, headers: { "content-type": "application/json" } }), 15_000, warn);
         if (r !== "ok") warn(`${w.kind}: alert not delivered (${r === "failed" ? "unreachable" : r.rejected})`);
       }),
     );

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fakeMcpServer, testServer } from "../src/checks/testing/servers.js";
 import type { RdapResult } from "../src/checks/domain/rdap.js";
-import { discordPayload, slackPayload, webhookSender } from "../src/alerts.js";
+import { discordPayload, slackPayload, webhookPayload, webhookSender } from "../src/alerts.js";
+import { newWebhookSecret, signWebhook } from "../src/checks/webhook.js";
 import { run } from "../src/cli.js";
 import { configFromEnv, jsonSchema, parseConfig, ConfigError } from "../src/config.js";
 import { alertDetail, judge, type Alert } from "../src/judge.js";
@@ -30,6 +31,19 @@ describe("the config", () => {
     expect(() => parseConfig({ sites: [site], alerts: [{ kind: "discord", url: "https://evil.test/api/webhooks/1/x" }] })).toThrow(/not a discord webhook/);
     expect(() => parseConfig({ sites: [site], alerts: [{ kind: "slack", env: "NOPE" }] }, {})).toThrow(/NOPE isn't set/);
     expect(() => parseConfig({ sites: [site, site] })).toThrow(/two sites/);
+  });
+
+  it("reads a generic webhook with its signing secret, and refuses one without", () => {
+    const site = { slug: "ex", name: "Example", url: "https://example.com" };
+    const secret = newWebhookSecret();
+    const { webhooks } = parseConfig({ sites: [site], alerts: [{ kind: "webhook", env: "HOOK", secretEnv: "HOOK_SECRET" }] }, { HOOK: "https://hooks.example.com/x", HOOK_SECRET: secret });
+    expect(webhooks).toEqual([{ kind: "webhook", url: "https://hooks.example.com/x", secret }]);
+    expect(() => parseConfig({ sites: [site], alerts: [{ kind: "webhook", url: "https://hooks.example.com/x" }] })).toThrow(/secretEnv/);
+    expect(() => parseConfig({ sites: [site], alerts: [{ kind: "discord", env: "D", secretEnv: "S" }] }, { D: DISCORD })).toThrow(/secretEnv/);
+    expect(() => parseConfig({ sites: [site], alerts: [{ kind: "webhook", url: "https://hooks.example.com/x", secretEnv: "S" }] }, { S: "hunter2" })).toThrow(/isn't a signing secret/);
+    expect(() => parseConfig({ sites: [site], alerts: [{ kind: "webhook", url: "https://10.0.0.5/x", secretEnv: "S" }] }, { S: secret })).toThrow(/not a webhook webhook URL/);
+    const fromEnv = configFromEnv({ SITES: "https://example.com", WEBHOOK_URL: "https://hooks.example.com/x" });
+    expect(parseConfig(fromEnv, { WEBHOOK_URL: "https://hooks.example.com/x", WEBHOOK_SECRET: secret }).webhooks[0]!.kind).toBe("webhook");
   });
 
   it("can come from SITES and the webhook variables alone, and publishes a JSON schema", () => {
@@ -90,6 +104,19 @@ describe("alerts", () => {
     // The site's words stay escaped on Slack; only our date markup is markup.
     const hostile: Alert = { ...up, detail: "<!channel> & <x>" };
     expect((slackPayload(hostile) as { text: string }).text).toContain("&lt;!channel&gt; &amp; &lt;x&gt; Since <!date^");
+  });
+
+  it("go to a generic webhook as signed JSON", async () => {
+    const secret = newWebhookSecret();
+    const sent: Array<{ url: string; body: string; headers: Record<string, string> }> = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => (sent.push({ url, body: init.body as string, headers: init.headers as Record<string, string> }), new Response(null, { status: 204 }))) as unknown as typeof fetch;
+    await webhookSender([{ kind: "webhook", url: "https://hooks.example.com/x", secret }], { fetchImpl })(a);
+    const [s] = sent;
+    const body = JSON.parse(s!.body);
+    expect(body).toEqual(webhookPayload(a, body.id));
+    expect(body).toMatchObject({ type: `alert.${a.kind}`, version: 1, site: a.site, title: a.title });
+    expect(s!.headers["webhook-signature"]).toBe(signWebhook(secret, body.id, Number(s!.headers["webhook-timestamp"]), s!.body));
+    expect(s!.headers["webhook-id"]).toBe(body.id);
   });
 
   it("go to each webhook, and never to a URL off its service's hosts", async () => {

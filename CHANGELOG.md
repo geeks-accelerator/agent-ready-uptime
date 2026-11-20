@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Generic webhooks: a `webhook` alert kind posts each alert as versioned JSON to any public HTTPS endpoint, signed by [Standard Webhooks](https://www.standardwebhooks.com/). Config: `{ "kind": "webhook", "env": "WEBHOOK_URL", "secretEnv": "WEBHOOK_SECRET" }`, or `WEBHOOK_URL` and `WEBHOOK_SECRET` beside `SITES`; `agent-ready-uptime secret` prints a new secret.
+- `checks/webhook`: `WEBHOOK_KINDS` gains `"webhook"` (checked by shape: HTTPS, a name not a raw IP, no user info, at most 2,048 characters), `signWebhook`, `webhookHeaders`, `newWebhookSecret`, and `publicFetch`, a `fetch` over `fetchUrl` that refuses private addresses after resolving and never follows redirects. `postWithRetries` answers a private address at once instead of retrying.
+
 ## 0.2.0
 
 - Four newer agent files can be checked: an API catalog (RFC 9727, `/.well-known/api-catalog`), an agent skills index (`/.well-known/agent-skills/index.json`), an AI catalog (`/.well-known/ai-catalog.json`, or `/.well-known/ard.json`) and an MCP server card (`/.well-known/mcp/server-card.json`). Each has a validator, a label and a path; `discoverAgentFiles` reads them when asked (`kinds`), and by default still reads only the settled files (`DISCOVERED_FILE_KINDS`), so a running monitor makes no new requests.

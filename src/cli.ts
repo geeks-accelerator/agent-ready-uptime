@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { webhookSender } from "./alerts.js";
+import { newWebhookSecret } from "./checks/webhook.js";
 import { ConfigError, configFromEnv, jsonSchema, loadConfig, parseConfig, type Config, type Webhook } from "./config.js";
 import { Runner } from "./runner.js";
 import { pageServer } from "./server.js";
@@ -14,9 +15,11 @@ Usage:
   agent-ready-uptime check   [--config FILE] [--state FILE]     one pass; exit 1 if anything is failing
   agent-ready-uptime init    <https://your.site> [more sites]   write monitor.config.json
   agent-ready-uptime schema                                     print the config's JSON schema
+  agent-ready-uptime secret                                     print a new signing secret for a webhook
 
 Config: --config, else ./monitor.config.json, else the SITES environment variable
-(comma-separated URLs) with DISCORD_WEBHOOK_URL and/or SLACK_WEBHOOK_URL.
+(comma-separated URLs) with DISCORD_WEBHOOK_URL, SLACK_WEBHOOK_URL and/or
+WEBHOOK_URL (any HTTPS endpoint, signed with WEBHOOK_SECRET).
 `;
 
 /** A usage or config problem: exit code 2, the message on stderr. */
@@ -66,6 +69,7 @@ async function command(argv: string[]): Promise<number | null> {
   if (values.help) return (process.stdout.write(USAGE), 0);
 
   if (command === "schema") return (process.stdout.write(`${JSON.stringify(jsonSchema(), null, 2)}\n`), 0);
+  if (command === "secret") return (process.stdout.write(`${newWebhookSecret()}\n`), 0);
 
   if (command === "init") {
     if (!rest.length) fail("init needs at least one site URL, e.g. agent-ready-uptime init https://example.com");
@@ -78,7 +82,7 @@ async function command(argv: string[]): Promise<number | null> {
     process.stdout.write(
       c.alerts.length
         ? "Wrote monitor.config.json. Run: npx agent-ready-uptime watch\n"
-        : 'Wrote monitor.config.json, with no alerts yet: set DISCORD_WEBHOOK_URL or SLACK_WEBHOOK_URL and add { "kind": "discord", "env": "DISCORD_WEBHOOK_URL" } to "alerts". Run: npx agent-ready-uptime watch\n',
+        : 'Wrote monitor.config.json, with no alerts yet: set DISCORD_WEBHOOK_URL, SLACK_WEBHOOK_URL or WEBHOOK_URL and add { "kind": "discord", "env": "DISCORD_WEBHOOK_URL" } to "alerts". Run: npx agent-ready-uptime watch\n',
     );
     return 0;
   }

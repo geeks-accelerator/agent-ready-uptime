@@ -1,6 +1,6 @@
 # agent-ready-uptime
 
-Agent-ready uptime monitoring, open source: uptime, TLS and domain expiry, sitemaps, llms.txt, AI crawler access and MCP tool changes, with alerts to Discord or Slack and a status page.
+Agent-ready uptime monitoring, open source: uptime, TLS and domain expiry, sitemaps, llms.txt, AI crawler access and MCP tool changes, with alerts to Discord, Slack or any webhook and a status page.
 
 Made by [Sites in the Woods](https://sitesinthewoods.com), which runs these same checks as a hosted service: every outage confirmed from a second region, 400 days of history, AI agents walking through your site's real tasks, and team dashboards. This is the free part you host yourself.
 
@@ -62,9 +62,10 @@ Requests identify themselves as `agent-ready-uptime (+https://github.com/geeks-a
 - `homepage`: `url` (a health endpoint instead of `/`), `keyword`, `keywordAbsent`, `expectedStatus`, `expectedFinalUrl`, `confirmFailures`, `timeoutMs`, `intervalSeconds`.
 - `agent`: `paths` (files at non-standard places), `mcp`, `exclude` (`"llms_txt"`, `"mcp"`, `"crawler:GPTBot"`), `crawlers` (more user agents), `intervalSeconds`.
 - `defaults`: how often each kind runs (`homepageIntervalSeconds`, `agentIntervalSeconds`, `sitemapIntervalSeconds`, `portIntervalSeconds`, `dnsIntervalSeconds`) and timeouts.
-- Webhook URLs are secrets: name the environment variable (`env`) rather than putting the URL in the file. Only Discord's and Slack's own webhook hosts are accepted.
+- Webhook URLs are secrets: name the environment variable (`env`) rather than putting the URL in the file. Discord and Slack: only their own webhook hosts are accepted.
+- `{ "kind": "webhook", "env": "WEBHOOK_URL", "secretEnv": "WEBHOOK_SECRET" }` posts each alert as JSON to any public HTTPS endpoint (Zapier, Make, n8n, your own), signed by [Standard Webhooks](https://www.standardwebhooks.com/) (`webhook-id`, `webhook-timestamp`, `webhook-signature`), so its libraries verify it in any language. `npx agent-ready-uptime secret` makes a secret. The body is `{ type: "alert.down", version: 1, id, at, kind, site, target, title, detail, url }`; `title` and `detail` can quote a site, so treat them as text. A private address is refused after resolving, and redirects aren't followed.
 
-No file? `SITES=https://a.example,https://b.example` with `DISCORD_WEBHOOK_URL` and/or `SLACK_WEBHOOK_URL` is a whole config.
+No file? `SITES=https://a.example,https://b.example` with `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL` and/or `WEBHOOK_URL` (with `WEBHOOK_SECRET`) is a whole config.
 
 ## Running it
 
@@ -126,7 +127,7 @@ Each module is `agent-ready-uptime/checks/<module>`:
 | `spec` | a check as data (`CheckSpec`), run by `runSpec`, validated by `specSchema` |
 | `rules` | when a failure is news (three in a row for a page) and when an expiry is announced |
 | `config` | a site's config keys (zod), shared with the hosted service |
-| `webhook` | Discord and Slack webhook URLs checked by host; posting with retries |
+| `webhook` | Discord and Slack webhook URLs checked by host, generic ones by shape; posting with retries; Standard Webhooks signing (`signWebhook`, `webhookHeaders`); `publicFetch`, a `fetch` that never reaches a private address |
 | `chart`, `format`, `html/template` | a line's geometry with gaps kept, round axes, response times in words, escaped HTML |
 | `testing/servers`, `testing/fake-mcp` | local sites and an MCP server for tests |
 

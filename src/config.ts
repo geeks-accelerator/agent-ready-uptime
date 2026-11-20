@@ -15,8 +15,11 @@ const alertSchema = z
     url: z.string().optional(),
     /** …the environment variable that holds it, e.g. "DISCORD_WEBHOOK_URL". */
     env: z.string().regex(/^[A-Z][A-Z0-9_]*$/).optional(),
+    /** A generic webhook's signing secret (`whsec_…`, Standard Webhooks): the environment variable that holds it. */
+    secretEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/).optional(),
   })
-  .refine((a) => (a.url === undefined) !== (a.env === undefined), "set url or env, not both");
+  .refine((a) => (a.url === undefined) !== (a.env === undefined), "set url or env, not both")
+  .refine((a) => (a.kind === "webhook") === (a.secretEnv !== undefined), "a webhook names its signing secret's variable (secretEnv); Discord and Slack have none");
 
 export const configSchema = z.strictObject({
   $schema: z.string().optional(),
@@ -30,6 +33,8 @@ export type Site = OpenSite;
 export interface Webhook {
   kind: WebhookKind;
   url: string;
+  /** A generic webhook's signing secret. */
+  secret?: string;
 }
 
 /** The JSON schema editors use for monitor.config.json (`agent-ready-uptime schema`). */
@@ -53,7 +58,10 @@ export function parseConfig(raw: unknown, env: NodeJS.ProcessEnv = process.env):
     const url = a.url ?? env[a.env!];
     if (!url) throw new ConfigError(`alerts[${i}]: ${a.env} isn't set`);
     if (!isWebhook(a.kind, url)) throw new ConfigError(`alerts[${i}]: not a ${a.kind} webhook URL (expected ${WEBHOOK_EXAMPLE[a.kind]})`);
-    return { kind: a.kind, url: url.trim() };
+    if (a.secretEnv === undefined) return { kind: a.kind, url: url.trim() };
+    const secret = env[a.secretEnv];
+    if (!secret || !/^whsec_[A-Za-z0-9+/=]{32,}$/.test(secret)) throw new ConfigError(`alerts[${i}]: ${a.secretEnv} isn't a signing secret (whsec_…; \`agent-ready-uptime secret\` makes one)`);
+    return { kind: a.kind, url: url.trim(), secret };
   });
   return { config, webhooks };
 }
@@ -80,7 +88,11 @@ export function configFromEnv(env: NodeJS.ProcessEnv): unknown | null {
   if (!urls.length) return null;
   return {
     sites: urls.map((url) => ({ slug: slugOf(url), name: new URL(url).hostname.replace(/^www\./, ""), url })),
-    alerts: [...(env.DISCORD_WEBHOOK_URL ? [{ kind: "discord", env: "DISCORD_WEBHOOK_URL" }] : []), ...(env.SLACK_WEBHOOK_URL ? [{ kind: "slack", env: "SLACK_WEBHOOK_URL" }] : [])],
+    alerts: [
+      ...(env.DISCORD_WEBHOOK_URL ? [{ kind: "discord", env: "DISCORD_WEBHOOK_URL" }] : []),
+      ...(env.SLACK_WEBHOOK_URL ? [{ kind: "slack", env: "SLACK_WEBHOOK_URL" }] : []),
+      ...(env.WEBHOOK_URL ? [{ kind: "webhook", env: "WEBHOOK_URL", secretEnv: "WEBHOOK_SECRET" }] : []),
+    ],
   };
 }
 

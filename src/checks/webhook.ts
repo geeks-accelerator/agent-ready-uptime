@@ -1,31 +1,60 @@
-/** A webhook kind we post to. */
-export type WebhookKind = "discord" | "slack";
+import { createHmac, randomBytes } from "node:crypto";
+import net from "node:net";
+import { fetchUrl } from "./http/request.js";
+
+/** A webhook kind we post to: Discord's and Slack's own, or a generic one (any public HTTPS URL, signed). */
+export type WebhookKind = "discord" | "slack" | "webhook";
 
 /**
  * Webhook URLs as a team pastes them.
- * Only each kind's own hosts, over HTTPS, with its path shape: a pasted URL is never
- * fetched anywhere else (an internal address, a metadata IP). Checked on save and
- * again before every post.
+ * Discord and Slack: only each service's own hosts, over HTTPS, with its path shape.
+ * A generic webhook may be any host, so its rule is the shape (HTTPS, a name not a raw
+ * IP, no user info, no fragment, at most 2,048 characters) and the address check at
+ * connect time: it's posted through `publicFetch`, which refuses private addresses
+ * after resolving. Checked on save and again before every post.
  */
-const PATTERNS: Record<WebhookKind, RegExp> = {
+const PATTERNS: Record<Exclude<WebhookKind, "webhook">, RegExp> = {
   discord: /^https:\/\/(?:discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)\/api\/webhooks\/\d{5,30}\/[A-Za-z0-9_-]{20,200}$/,
   slack: /^https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]{6,20}\/B[A-Z0-9]{6,20}\/[A-Za-z0-9]{16,64}$/,
 };
 
-export const WEBHOOK_KINDS: readonly WebhookKind[] = ["discord", "slack"];
+export const WEBHOOK_KINDS: readonly WebhookKind[] = ["discord", "slack", "webhook"];
 
-export const WEBHOOK_LABEL: Record<WebhookKind, string> = { discord: "Discord", slack: "Slack" };
+export const WEBHOOK_LABEL: Record<WebhookKind, string> = { discord: "Discord", slack: "Slack", webhook: "Webhook" };
 
-export const WEBHOOK_EXAMPLE: Record<WebhookKind, string> = { discord: "https://discord.com/api/webhooks/…", slack: "https://hooks.slack.com/services/…" };
+export const WEBHOOK_EXAMPLE: Record<WebhookKind, string> = { discord: "https://discord.com/api/webhooks/…", slack: "https://hooks.slack.com/services/…", webhook: "https://example.com/hooks/…" };
+
+/** The longest generic webhook URL we take. */
+export const WEBHOOK_URL_MAX = 2048;
 
 export function isWebhook(kind: WebhookKind, url: string): boolean {
+  if (kind === "webhook") return isGenericWebhook(url);
   return PATTERNS[kind].test(url.trim());
+}
+
+function isGenericWebhook(raw: string): boolean {
+  const url = raw.trim();
+  if (url.length > WEBHOOK_URL_MAX || /\s/.test(url)) return false;
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  return u.protocol === "https:" && !u.username && !u.password && !u.hash && net.isIP(host) === 0 && host.includes(".") && !host.endsWith(".");
 }
 
 /** "https://discord.com/api/webhooks/123…/ab…yz": enough to recognise, not to use. */
 export function maskWebhook(url: string): string {
   const m = /^(https:\/\/[^/]+\/)(.+)\/(\S+)$/.exec(url);
-  if (!m) return "set";
+  if (!m) {
+    try {
+      return `${new URL(url).origin}/…`;
+    } catch {
+      return "set";
+    }
+  }
   const secret = m[3]!;
   return `${m[1]}${m[2]!.slice(0, 18)}…/${secret.slice(0, 2)}…${secret.slice(-2)}`;
 }
@@ -72,6 +101,11 @@ export async function postWithRetries(
       const missing = res.status === 404 || res.status === 410 || /no_service|channel_not_found|channel_is_archived|invalid_token|no_team/.test(text);
       return { rejected: missing ? `the ${name} webhook no longer exists (HTTP ${res.status})` : `rejected by ${name}` };
     } catch (e) {
+      // An address we never post to (a private one, found after resolving): no retry would change it.
+      if ((e as { code?: string }).code === "SM_BLOCKED") {
+        warn(`${name.toLowerCase()} webhook refused: ${(e as Error).message}`);
+        return { rejected: "the webhook's address is private" };
+      }
       warn(`${name.toLowerCase()} webhook error (attempt ${attempt}): ${(e as Error).message}`);
       await sleep(1000 * attempt);
     }
@@ -79,3 +113,59 @@ export async function postWithRetries(
   warn(`${name.toLowerCase()} webhook: post failed after 5 attempts`);
   return "failed";
 }
+
+/**
+ * A new signing secret for a generic webhook, as Standard Webhooks writes one:
+ * `whsec_` and 32 random bytes in base64 (https://www.standardwebhooks.com/).
+ */
+export function newWebhookSecret(): string {
+  return `whsec_${randomBytes(32).toString("base64")}`;
+}
+
+/**
+ * Standard Webhooks' signature: base64 HMAC-SHA256, keyed by the secret's bytes (after
+ * `whsec_`), over `id.timestamp.body`, written `v1,<signature>`. Receivers verify it with
+ * the spec's libraries in any language; `timestamp` is in seconds.
+ */
+export function signWebhook(secret: string, id: string, timestamp: number, body: string): string {
+  const key = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
+  return `v1,${createHmac("sha256", key).update(`${id}.${timestamp}.${body}`).digest("base64")}`;
+}
+
+/** The headers a signed post carries: Standard Webhooks' three, and JSON. */
+export function webhookHeaders(secret: string, id: string, body: string, now: number = Date.now()): Record<string, string> {
+  const timestamp = Math.floor(now / 1000);
+  return {
+    "content-type": "application/json",
+    "webhook-id": id,
+    "webhook-timestamp": String(timestamp),
+    "webhook-signature": signWebhook(secret, id, timestamp, body),
+  };
+}
+
+/**
+ * A `fetch` for posting to a URL someone pasted: `fetchUrl`'s POST, so the address is
+ * resolved once and refused if it's private (the `SM_BLOCKED` error, which
+ * `postWithRetries` answers without retrying), redirects are never followed, the wait
+ * is capped at 10 seconds and at most 4 KB of the answer is read. Pass a `user-agent`
+ * header to name the sender.
+ */
+export const publicFetch: typeof fetch = async (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const headers: Record<string, string> = {};
+  new Headers(init?.headers).forEach((v, k) => (headers[k] = v));
+  const r = await fetchUrl(url, {
+    method: (init?.method as "POST" | undefined) ?? "POST",
+    ...(typeof init?.body === "string" ? { body: init.body } : {}),
+    headers,
+    accept: "*/*",
+    timeoutMs: 10_000,
+    maxBytes: 4096,
+  });
+  if (r.error === "invalid_url" && /private address/.test(r.errorMessage ?? "")) throw Object.assign(new Error(r.errorMessage!), { code: "SM_BLOCKED" });
+  if (r.error || r.statusCode === null) throw new Error(r.errorMessage ?? r.error ?? "no answer");
+  const out = new Headers();
+  for (const [k, v] of Object.entries(r.headers)) if (v !== undefined) out.set(k, Array.isArray(v) ? v.join(", ") : v);
+  const empty = r.statusCode === 204 || r.statusCode === 205 || r.statusCode === 304;
+  return new Response(empty ? null : new Uint8Array(r.body), { status: r.statusCode, headers: out });
+};
