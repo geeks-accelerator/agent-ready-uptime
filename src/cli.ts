@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { jwkThumbprint, newSigningKey } from "./checks/http/sign.js";
 import { writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { webhookSender } from "./alerts.js";
@@ -18,6 +19,7 @@ Usage:
   agent-ready-uptime init    <https://your.site> [more sites]   write monitor.config.json
   agent-ready-uptime schema                                     print the config's JSON schema
   agent-ready-uptime secret                                     print a new signing secret for a webhook
+  agent-ready-uptime signing-key                                print a new Ed25519 key for signing requests (MONITOR_SIGNING_KEY)
 
 Config: --config, else ./monitor.config.json, else the SITES environment variable
 (comma-separated URLs) with DISCORD_WEBHOOK_URL, SLACK_WEBHOOK_URL and/or
@@ -73,6 +75,12 @@ async function command(argv: string[]): Promise<number | null> {
 
   if (command === "schema") return (process.stdout.write(`${JSON.stringify(jsonSchema(), null, 2)}\n`), 0);
   if (command === "secret") return (process.stdout.write(`${newWebhookSecret()}\n`), 0);
+  if (command === "signing-key") {
+    const { privateJwk, publicJwk } = newSigningKey();
+    process.stdout.write(`${privateJwk}\n`);
+    process.stderr.write(`Set it as MONITOR_SIGNING_KEY, and MONITOR_SIGNATURE_AGENT to the https origin that serves its directory. Its public key (keyid ${jwkThumbprint(publicJwk)}): ${JSON.stringify(publicJwk)}\n`);
+    return 0;
+  }
 
   if (command === "init") {
     if (!rest.length) fail("init needs at least one site URL, e.g. agent-ready-uptime init https://example.com");

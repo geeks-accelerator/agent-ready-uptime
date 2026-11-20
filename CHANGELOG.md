@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+
+- `checks/http/sign`: Web Bot Auth request signing (HTTP Message Signatures, RFC 9421, Ed25519), so a site's CDN can verify a monitor's requests instead of trusting a user agent anyone can copy. `signatureHeaders` covers `@authority` and `signature-agent` with `created`, `expires` (5 minutes), `keyid` (the RFC 7638 thumbprint), a nonce and `tag="web-bot-auth"`; `signaturesDirectory` builds the signed JWK Set served at `/.well-known/http-message-signatures-directory`; `newSigningKey`, `signerFrom`, `verifySignatureHeaders`.
+- `fetchUrl` signs each hop afresh (the signature covers the host) when given `sign`, or with the process's own key: set `MONITOR_SIGNING_KEY` (from `agent-ready-uptime signing-key`) and `MONITOR_SIGNATURE_AGENT` (the https origin serving its directory). Only the monitor profile signs: crawler probes and browser requests never do, so a probe still tests how a site treats a crawler's name. The status page serves the directory when a key is set.
+- A UCP business profile (`/.well-known/ucp`, the Universal Commerce Protocol) is a new emerging agent file, `ucp_profile`: a version and at least one service, each endpoint an http(s) URL (`no_services` is a new reason). Its summary is the version and counts, never the profile's text.
+- `productFacts`: what a page's product structured data gives an agent shopping for it (a name, description, link, image, brand, a price above 0 with its currency, availability, a GTIN or MPN, and whether the price appears in the page's own text), as closed facts.
+
 ## 0.6.0
 
 - `checks/domain/registration`: `judgeRegistration(before, after, at)` says what a domain's registration change means. A date that moved forward before the old expiry is a renewal (`"seen"`). One that moved after expiry, or with the `auto renew period` status, is only the registry's own renewal (`"registry"`): for .com, .net and most gTLDs the registry renews the day after expiry whether or not the registrar was paid, and the registrar may then park the site. It also returns `unpaid` (that status), `bad` (holds, redemption, pending delete), `locks` (removed and added) and `parked` (nameservers just moved to a parking host, `PARKING_NS`).

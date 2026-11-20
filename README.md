@@ -33,6 +33,8 @@ A file or crawler the site never served isn't an alert (that's the site's choice
 
 Requests identify themselves as `agent-ready-uptime (+https://github.com/geeks-accelerator/agent-ready-uptime)` (set `MONITOR_USER_AGENT` to name your own), send no cookies or credentials, and refuse private and loopback addresses, so a config can't point it at your internal network.
 
+**Signed requests (Web Bot Auth).** A user agent is a claim anyone can copy, so CDNs that check bots (Cloudflare among them) verify signatures instead. Run `agent-ready-uptime signing-key`, set the key it prints as `MONITOR_SIGNING_KEY`, and set `MONITOR_SIGNATURE_AGENT` to the https origin where your status page is served: every monitor request then carries a signature, and the status page serves its key directory at `/.well-known/http-message-signatures-directory`. Crawler probes never sign, since they test how a site treats a crawler's name. Register the origin with your CDN's verified bot program if you want it allowed by name.
+
 ## Configuration
 
 `monitor.config.json` (`init` writes one; `npx agent-ready-uptime schema` prints its JSON schema, and editors pick it up from `$schema`):

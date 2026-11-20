@@ -1,11 +1,14 @@
 import http from "node:http";
 import { PAGE_JS, renderPage } from "./page.js";
 import type { Runner } from "./runner.js";
+import { defaultSigner } from "./checks/http/request.js";
+import { SIGNATURES_DIRECTORY_PATH, signaturesDirectory } from "./checks/http/sign.js";
 
 /**
  * The status page's server: GET only, no forms, nothing on it changes anything. It
  * binds to 127.0.0.1 unless told otherwise (it shows the sites you watch; exposing
- * it is the operator's choice). /healthz for platforms that probe one.
+ * it is the operator's choice). /healthz for platforms that probe one. With a signing key set, it
+ * also serves the key directory a site's CDN reads to verify our signed requests.
  */
 const HEADERS = {
   "x-content-type-options": "nosniff",
@@ -25,6 +28,9 @@ export function pageServer(runner: Runner): http.Server {
       res.writeHead(200, { ...HEADERS, "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }).end(req.method === "HEAD" ? undefined : body);
     } else if (path === "/page.js") {
       res.writeHead(200, { ...HEADERS, "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" }).end(PAGE_JS);
+    } else if (path === SIGNATURES_DIRECTORY_PATH && defaultSigner()) {
+      const dir = signaturesDirectory([defaultSigner()!]);
+      res.writeHead(200, { ...HEADERS, ...dir.headers, "cache-control": "max-age=3600" }).end(req.method === "HEAD" ? undefined : dir.body);
     } else if (path === "/healthz") {
       res.writeHead(200, { ...HEADERS, "content-type": "text/plain" }).end("ok\n");
     } else {

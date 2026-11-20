@@ -221,6 +221,109 @@ export function organizationFacts(html: string): OrganizationFacts {
   return best;
 }
 
+/**
+ * What a page's product structured data gives an agent shopping for it, as closed facts: the
+ * fields product feeds and agents' catalogs need (ChatGPT's product feed asks for a title,
+ * description, link, image, price with currency, availability and brand; catalogs skip a product
+ * with no image or a price of 0). Never the values themselves.
+ */
+export interface ProductFacts {
+  /** Product (or ProductGroup, IndividualProduct…) nodes on the page. */
+  products: number;
+  name: boolean;
+  description: boolean;
+  url: boolean;
+  image: boolean;
+  brand: boolean;
+  /** An offer with a price above 0 (or a low price, for an AggregateOffer). */
+  price: boolean;
+  currency: boolean;
+  availability: boolean;
+  /** A GTIN (any length) or an MPN. */
+  identifier: boolean;
+  /** The offer's price also appears in the page's own text (false when there's no price to look for). */
+  priceShown: boolean;
+}
+
+const PRODUCT_TYPES = new Set(["Product", "ProductGroup", "IndividualProduct", "ProductModel", "SomeProducts", "Book", "Vehicle", "Car"]);
+
+const priceOf = (offer: Record<string, unknown>): number | null => {
+  for (const k of ["price", "lowPrice"]) {
+    const v = offer[k];
+    const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(/[^0-9.]/g, "")) : NaN;
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const spec = offer.priceSpecification;
+  if (spec && typeof spec === "object" && !Array.isArray(spec)) return priceOf(spec as Record<string, unknown>);
+  return null;
+};
+
+/** The page's text without markup, scripts or styles, for finding a price in it. Linear: found with indexOf, like `eachLdNode`. */
+function pageText(html: string): string {
+  const src = html.slice(0, 2 * 1024 * 1024);
+  const lower = src.toLowerCase();
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const lt = src.indexOf("<", i);
+    if (lt === -1) {
+      out += src.slice(i);
+      break;
+    }
+    out += `${src.slice(i, lt)} `;
+    const gt = src.indexOf(">", lt);
+    if (gt === -1) break;
+    const tag = /^<(script|style)\b/.exec(lower.slice(lt, lt + 8))?.[1];
+    if (tag) {
+      const close = lower.indexOf(`</${tag}`, gt);
+      if (close === -1) break;
+      i = close;
+      continue;
+    }
+    i = gt + 1;
+  }
+  return out.replace(/&nbsp;|&#160;/g, " ");
+}
+
+/** The page's product: the one that says the most, with every product counted. */
+export function productFacts(html: string): ProductFacts {
+  let best: ProductFacts = { products: 0, name: false, description: false, url: false, image: false, brand: false, price: false, currency: false, availability: false, identifier: false, priceShown: false };
+  let bestPrice: number | null = null;
+  let products = 0;
+  const size = (f: ProductFacts) => +f.name + +f.description + +f.url + +f.image + +f.brand + +f.price + +f.currency + +f.availability + +f.identifier;
+  eachLdNode(html, (o) => {
+    if (!typesOf(o).some((t) => PRODUCT_TYPES.has(t))) return;
+    products++;
+    const offers = (Array.isArray(o.offers) ? o.offers : o.offers ? [o.offers] : []).filter((x): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x));
+    const priced = offers.find((x) => priceOf(x) !== null) ?? offers[0];
+    const price = priced ? priceOf(priced) : null;
+    const f: ProductFacts = {
+      products: 0,
+      name: filled(o.name),
+      description: filled(o.description),
+      url: filled(o.url),
+      image: filled(o.image),
+      brand: filled(o.brand),
+      price: price !== null,
+      currency: !!priced && (filled(priced.priceCurrency) || filled((priced.priceSpecification as Record<string, unknown> | undefined)?.priceCurrency)),
+      availability: offers.some((x) => filled(x.availability)),
+      identifier: ["gtin", "gtin8", "gtin12", "gtin13", "gtin14", "mpn"].some((k) => filled(o[k]) || (typeof o[k] === "number")),
+      priceShown: false,
+    };
+    if (products === 1 || size(f) > size(best)) {
+      best = f;
+      bestPrice = price;
+    }
+  });
+  if (bestPrice !== null) {
+    const p = bestPrice as number;
+    const text = pageText(html);
+    const forms = new Set([p.toFixed(2), String(p), p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), p.toFixed(2).replace(".", ",")]);
+    best.priceShown = [...forms].some((form) => new RegExp(`(^|[^0-9.,])${form.replace(/[.,]/g, (c) => `\\${c}`)}($|[^0-9])`).test(text));
+  }
+  return { ...best, products };
+}
+
 /** True when an X-Robots-Tag header value blocks indexing. */
 export function headerNoindex(value: string | string[] | undefined): boolean {
   if (!value) return false;

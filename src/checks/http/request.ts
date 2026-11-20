@@ -7,6 +7,7 @@ import zlib from "node:zlib";
 import dns, { type LookupAddress, type LookupOptions } from "node:dns";
 import net from "node:net";
 import type { Transform } from "node:stream";
+import { signatureHeaders, signerFrom, type Signer } from "./sign.js";
 
 /** Our honest user agent: `MONITOR_USER_AGENT` names your monitor instead (site owners allowlist it in their WAF). */
 export const DEFAULT_USER_AGENT =
@@ -145,6 +146,35 @@ export interface FetchOptions {
    * (never requested). For checks that must stay on a site's own host.
    */
   stayOn?: ReadonlySet<string>;
+  /**
+   * Sign each hop with Web Bot Auth (`./sign`), so a site's CDN can verify who sent it: this signer,
+   * the process's own (`defaultSigner`) when unset, or none for false. Signed
+   * afresh per hop, since the signature covers the host. Only the "monitor" profile signs (others ignore it): a
+   * crawler probe asks how a site treats a crawler's name, and a signature would change the answer.
+   */
+  sign?: Signer | false;
+}
+
+let envSigner: Signer | null | undefined;
+/**
+ * The process's own signer, from `MONITOR_SIGNING_KEY` (an Ed25519 private JWK or PEM) and
+ * `MONITOR_SIGNATURE_AGENT` (the https origin serving its key directory): every "monitor" request
+ * signs with it unless `sign: false`. Unset, nothing signs. A bad key is reported once and nothing
+ * signs, since `fetchUrl` never throws.
+ */
+export function defaultSigner(): Signer | null {
+  if (envSigner !== undefined) return envSigner;
+  const key = process.env.MONITOR_SIGNING_KEY;
+  const agent = process.env.MONITOR_SIGNATURE_AGENT;
+  envSigner = null;
+  if (key && agent) {
+    try {
+      envSigner = signerFrom(key, agent, process.env.MONITOR_SIGNATURE_FORM === "dictionary" ? "dictionary" : "item");
+    } catch (e) {
+      console.error(`MONITOR_SIGNING_KEY is set but can't sign: ${(e as Error).message}`);
+    }
+  }
+  return envSigner;
 }
 
 /**
@@ -225,6 +255,7 @@ export async function fetchUrl(url: string, opts: FetchOptions = {}): Promise<Fe
   const timeoutMs = opts.timeoutMs ?? 10_000;
   const maxRedirects = opts.maxRedirects ?? 10;
   const allowPrivate = opts.allowPrivate ?? privateAllowedFor(url);
+  const signer = (opts.profile ?? "monitor") === "monitor" && opts.sign !== false ? (opts.sign ?? defaultSigner()) : null;
   const start = performance.now();
   const deadline = start + timeoutMs;
   const redirects: FetchResult["redirects"] = [];
@@ -268,7 +299,7 @@ export async function fetchUrl(url: string, opts: FetchOptions = {}): Promise<Fe
     const res = await requestOnce(parsed, {
       timeoutMs: remaining,
       maxBytes: opts.maxBytes ?? 5 * 1024 * 1024,
-      headers: { ...requestHeaders(opts.profile ?? "monitor", opts.accept), ...opts.headers },
+      headers: { ...requestHeaders(opts.profile ?? "monitor", opts.accept), ...opts.headers, ...(signer ? signatureHeaders(parsed, signer) : {}) },
       readBody: opts.readBody ?? true,
       method: opts.method ?? "GET",
       allowPrivate,

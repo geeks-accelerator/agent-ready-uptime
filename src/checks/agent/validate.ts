@@ -10,16 +10,16 @@ import { hostOf, isHttpUrl } from "../url.js";
 
 export type AgentFileKind =
   | "llms_txt" | "agent_card" | "openapi" | "mcp_manifest" | "robots_txt" | "security_txt"
-  | "api_catalog" | "skills_index" | "ai_catalog" | "mcp_server_card";
+  | "api_catalog" | "skills_index" | "ai_catalog" | "mcp_server_card" | "ucp_profile";
 
 /** Every kind a target can expect, or a config can name. */
-export const AGENT_FILE_KINDS: readonly AgentFileKind[] = ["llms_txt", "agent_card", "openapi", "mcp_manifest", "robots_txt", "security_txt", "api_catalog", "skills_index", "ai_catalog", "mcp_server_card"];
+export const AGENT_FILE_KINDS: readonly AgentFileKind[] = ["llms_txt", "agent_card", "openapi", "mcp_manifest", "robots_txt", "security_txt", "api_catalog", "skills_index", "ai_catalog", "mcp_server_card", "ucp_profile"];
 
 /**
- * The newer files (an API catalog, an agent skills index, an AI catalog, an MCP server card): still
+ * The newer files (an API catalog, an agent skills index, an AI catalog, an MCP server card, a UCP profile): still
  * settling as standards, so discovery reads them only when asked (`kinds`), and a check can grade them.
  */
-export const EMERGING_FILE_KINDS: readonly AgentFileKind[] = ["api_catalog", "skills_index", "ai_catalog", "mcp_server_card"];
+export const EMERGING_FILE_KINDS: readonly AgentFileKind[] = ["api_catalog", "skills_index", "ai_catalog", "mcp_server_card", "ucp_profile"];
 
 /** What discovery looks for by default: the settled files. */
 export const DISCOVERED_FILE_KINDS: readonly AgentFileKind[] = AGENT_FILE_KINDS.filter((k) => !EMERGING_FILE_KINDS.includes(k));
@@ -27,7 +27,7 @@ export const DISCOVERED_FILE_KINDS: readonly AgentFileKind[] = AGENT_FILE_KINDS.
 /** Names for the files, and the targets discovery makes from them, wherever they're shown (the dashboard, the try-it scan). */
 export const AGENT_FILE_LABELS: Record<string, string> = {
   llms_txt: "llms.txt", agent_card: "Agent card", openapi: "OpenAPI", mcp_manifest: "MCP manifest", mcp: "MCP server", robots_txt: "robots.txt", security_txt: "security.txt", crawler: "Crawler probe",
-  api_catalog: "API catalog", skills_index: "Agent skills index", ai_catalog: "AI catalog", mcp_server_card: "MCP server card",
+  api_catalog: "API catalog", skills_index: "Agent skills index", ai_catalog: "AI catalog", mcp_server_card: "MCP server card", ucp_profile: "UCP profile",
 };
 
 /** Well-known locations, probed during discovery. */
@@ -46,6 +46,8 @@ export const AGENT_FILE_PATHS: Record<AgentFileKind, string> = {
   ai_catalog: "/.well-known/ai-catalog.json",
   // MCP server cards (SEP-1649).
   mcp_server_card: "/.well-known/mcp/server-card.json",
+  // A Universal Commerce Protocol business profile: what a shop offers agents (checkout, orders).
+  ucp_profile: "/.well-known/ucp",
 };
 
 /** Other places a file is published under: tried in order when the first answers not found. */
@@ -58,7 +60,7 @@ export const AGENT_FILE_ALTERNATES: Partial<Record<AgentFileKind, string[]>> = {
 export type AgentFileReason =
   | "html_fallback" | "wrong_type" | "no_title" | "too_short" | "not_json" | "no_name" | "no_url" | "off_site"
   | "no_version" | "no_paths" | "no_endpoint" | "bad_endpoint" | "no_contact" | "expires_count" | "bad_expires"
-  | "no_linkset" | "no_skills" | "no_entries";
+  | "no_linkset" | "no_skills" | "no_entries" | "no_services";
 
 export interface AgentFileVerdict {
   /** Machine-readable failure (null when valid). */
@@ -103,6 +105,8 @@ export function validateAgentFile(kind: AgentFileKind, body: string, contentType
       return aiCatalog(body);
     case "mcp_server_card":
       return mcpServerCard(body, url);
+    case "ucp_profile":
+      return ucpProfile(body, url);
   }
 }
 
@@ -226,6 +230,36 @@ function mcpServerCard(body: string, url: string): AgentFileVerdict {
   if (!o) return bad("mcp_server_card", "not_json", "not a JSON object");
   if (typeof o.name !== "string" || !o.name) return bad("mcp_server_card", "no_name", "missing name");
   return mcpEndpointOf("mcp_server_card", o, url);
+}
+
+/**
+ * A UCP business profile: a `ucp` object with its `version` and at least one service, each
+ * service's endpoints (`rest`, `mcp`, `a2a`, `embedded`) http(s) URLs. The summary is the version
+ * and counts, never the profile's own names.
+ */
+function ucpProfile(body: string, url: string): AgentFileVerdict {
+  const o = json(body);
+  if (!o) return bad("ucp_profile", "not_json", "not a JSON object");
+  const ucp = o.ucp && typeof o.ucp === "object" && !Array.isArray(o.ucp) ? (o.ucp as Record<string, unknown>) : null;
+  if (!ucp || typeof ucp.version !== "string" || !ucp.version) return bad("ucp_profile", "no_version", "no ucp.version");
+  const services = ucp.services && typeof ucp.services === "object" && !Array.isArray(ucp.services) ? Object.values(ucp.services as Record<string, unknown>).filter((v) => v && typeof v === "object") : [];
+  if (!services.length) return bad("ucp_profile", "no_services", "no services in ucp.services");
+  for (const svc of services as Array<Record<string, unknown>>) {
+    for (const t of ["rest", "mcp", "a2a", "embedded"]) {
+      const b = svc[t] as Record<string, unknown> | undefined;
+      if (!b || typeof b !== "object" || b.endpoint === undefined) continue;
+      let abs = "";
+      try {
+        abs = typeof b.endpoint === "string" ? new URL(b.endpoint, url).toString() : "";
+      } catch {
+        abs = "";
+      }
+      if (!abs || !isHttpUrl(abs)) return bad("ucp_profile", "bad_endpoint", `a ${t} endpoint isn't an http(s) URL`);
+    }
+  }
+  const caps = Array.isArray(ucp.capabilities) ? ucp.capabilities.length : ucp.capabilities && typeof ucp.capabilities === "object" ? Object.keys(ucp.capabilities).length : 0;
+  const version = /^[\w.-]{1,32}$/.test(ucp.version) ? ucp.version : "";
+  return ok(`UCP${version ? ` ${version}` : ""} · ${count(services.length, "service")}${caps ? ` · ${count(caps, "capability", "capabilities")}` : ""}`);
 }
 
 /**
