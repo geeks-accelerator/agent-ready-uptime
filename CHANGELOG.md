@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- `measureHtml` counts two more parts of a page's HTML: `inlineStyleBytes` (inside `<style>` and in `style=""` attributes) and `imageMarkupBytes` (the `<img>`, `<picture>` and `<source>` tags themselves, `srcset` and `sizes` included), on the parse it already makes. A heavy page is usually one of these, inline scripts and data, or inline SVG.
+
 ## 0.4.0
 
 - `check` reports for people: failures first on stderr, each with why, then a count (`All 31 checks passed.`). The JSON lines on stdout are unchanged.

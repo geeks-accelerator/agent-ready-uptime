@@ -203,6 +203,18 @@ describe("page weight from HTML", () => {
     expect(w.svgBytes).toBe(Buffer.byteLength('<svg viewBox="0 0 1 1"><path d="M0 0"/></svg>'));
     expect(w.links).toEqual(["https://news.example/about", "https://elsewhere.org/"]);
   });
+
+  it("counts inline styles and image markup, the tags themselves with their srcset", () => {
+    const img = '<img src="a.png" srcset="a-640.png 640w, a-3840.png 3840w" sizes="100vw" alt="">';
+    const html = `<html><head><style>body{margin:0}</style></head><body>
+      <p style="color:red">x</p>
+      <picture><source srcset="b.avif" type="image/avif">${img}</picture>
+      </body></html>`;
+    const w = measureHtml(html, "https://news.example/");
+    expect(w.inlineStyleBytes).toBe(Buffer.byteLength("body{margin:0}") + Buffer.byteLength("color:red"));
+    expect(w.imageMarkupBytes).toBe(Buffer.byteLength("<picture>") + Buffer.byteLength('<source srcset="b.avif" type="image/avif">') + Buffer.byteLength(img));
+    expect(w.images).toBe(1);
+  });
 });
 
 describe("the form's config", () => {

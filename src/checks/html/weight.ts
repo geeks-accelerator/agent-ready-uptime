@@ -18,6 +18,10 @@ export interface HtmlWeight {
   lazyImages: number;
   /** Bytes of inline <svg> markup. */
   svgBytes: number;
+  /** Bytes of inline styles: inside <style> tags and in style="" attributes. */
+  inlineStyleBytes: number;
+  /** Bytes of image markup: the <img>, <picture> and <source> tags themselves, srcset and sizes included. */
+  imageMarkupBytes: number;
   /** Element count. */
   elements: number;
   /** <a href> targets and the share image (og:image), absolute http(s), deduplicated, without #fragments. */
@@ -82,7 +86,7 @@ const utf8 = (s: string) => Buffer.byteLength(s, "utf8");
 
 /** One pass over the document with the same parser as head.ts. */
 export function measureHtml(html: string, pageUrl: string): HtmlWeight {
-  const w: HtmlWeight = { scripts: 0, inlineScriptBytes: 0, frameworkBytes: 0, jsUrls: [], cssUrls: [], images: 0, lazyImages: 0, svgBytes: 0, elements: 0, links: [], speculation: [], lang: null, searchForm: false, anchors: [], rootId: null, rootElements: 0 };
+  const w: HtmlWeight = { scripts: 0, inlineScriptBytes: 0, frameworkBytes: 0, jsUrls: [], cssUrls: [], images: 0, lazyImages: 0, svgBytes: 0, inlineStyleBytes: 0, imageMarkupBytes: 0, elements: 0, links: [], speculation: [], lang: null, searchForm: false, anchors: [], rootId: null, rootElements: 0 };
   // The mount point's depth in the element stack while it's open (-1: not open), to count what's inside it.
   let rootDepth = -1;
   const js = new Set<string>();
@@ -100,6 +104,8 @@ export function measureHtml(html: string, pageUrl: string): HtmlWeight {
     }
   };
 
+  let inStyle = false;
+  let styleText = "";
   let inScript = false;
   let scriptIsData = false;
   let scriptIsRules = false;
@@ -132,6 +138,12 @@ export function measureHtml(html: string, pageUrl: string): HtmlWeight {
     {
       onopentag(name, attrs) {
         w.elements++;
+        if (attrs.style) w.inlineStyleBytes += utf8(attrs.style);
+        if (name === "img" || name === "source" || name === "picture") w.imageMarkupBytes += utf8(html.slice(parser.startIndex, parser.endIndex + 1));
+        if (name === "style") {
+          inStyle = true;
+          styleText = "";
+        }
         const region = regionOf(name, (attrs.role ?? "").trim().toLowerCase());
         stack.push(region);
         const hides = (attrs["aria-hidden"] ?? "").trim().toLowerCase() === "true" || "hidden" in attrs;
@@ -187,6 +199,7 @@ export function measureHtml(html: string, pageUrl: string): HtmlWeight {
         }
       },
       ontext(text) {
+        if (inStyle) styleText += text;
         if (inScript) scriptText += text;
         else if (anchor && skipDepth === 0 && (svgDepth === 0 || svgLabelDepth > 0)) anchor.text += text;
       },
@@ -207,6 +220,10 @@ export function measureHtml(html: string, pageUrl: string): HtmlWeight {
             w.anchors.push({ href: anchor.href, label, inChrome: anchor.inChrome, rel: anchor.rel, hidden: anchor.hidden, action: anchor.marked || urlActs(anchor.href, label) });
           }
           anchor = null;
+        }
+        if (name === "style" && inStyle) {
+          w.inlineStyleBytes += utf8(styleText);
+          inStyle = false;
         }
         if (name === "svg" && svgDepth > 0) {
           svgDepth--;
