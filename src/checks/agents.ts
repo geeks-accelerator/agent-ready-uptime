@@ -91,6 +91,14 @@ export function agentByToken(token: string): AiAgent | null {
   return BY_TOKEN.get(token.toLowerCase()) ?? null;
 }
 
+/**
+ * The forms a user agent writes each sending agent's token in, for a case-sensitive filter (Cloudflare's
+ * `userAgent_like` is): the table's form and its lowercase (Bing writes "bingbot").
+ */
+export function tokenForms(purpose?: AgentPurpose): string[] {
+  return [...new Set(AI_AGENTS.filter((a) => a.purpose !== null && (!purpose || a.purpose === purpose)).flatMap((a) => [a.token, a.token.toLowerCase()]))];
+}
+
 /** Agents that send requests (control tokens left out), longest token first so "Claude-SearchBot" wins over a shorter one. */
 const SENDERS = AI_AGENTS.filter((a) => a.purpose !== null).sort((a, b) => b.token.length - a.token.length);
 
@@ -99,11 +107,12 @@ export function agentNamed(userAgent: string): AiAgent | null {
   const ua = userAgent.toLowerCase();
   for (const a of SENDERS) {
     const t = a.token.toLowerCase();
-    const i = ua.indexOf(t);
-    if (i < 0) continue;
-    const before = i === 0 ? "" : ua[i - 1]!;
-    const after = ua[i + t.length] ?? "";
-    if (!/[a-z0-9-]/.test(before) && !/[a-z0-9-]/.test(after)) return a;
+    // Every place the token appears: "Googlebot-Video … Googlebot/2.1" names Googlebot at its second.
+    for (let i = ua.indexOf(t); i >= 0; i = ua.indexOf(t, i + 1)) {
+      const before = i === 0 ? "" : ua[i - 1]!;
+      const after = ua[i + t.length] ?? "";
+      if (!/[a-z0-9-]/.test(before) && !/[a-z0-9-]/.test(after)) return a;
+    }
   }
   return null;
 }

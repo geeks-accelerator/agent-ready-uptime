@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- `agentNamed` checks every place a token appears, so a user agent that names a longer word first ("Googlebot-Video … Googlebot/2.1") still names the agent.
+- `tokenForms(purpose?)`: each sending agent's token in the table's form and lowercase, for case-sensitive filters such as Cloudflare's `userAgent_like` (Bing writes "bingbot").
+
 ## 0.8.0
 
 - `checks/agents`: one table of the AI agents that read websites, `AI_AGENTS`, each with its operator, its purpose (`training`, `search`, or `user`: fetching a page because a person asked), what its operator says about robots.txt (`follows`, or `may-ignore-for-a-person`), and the documentation page and date it came from (checked 2026-11-21). Agents whose purpose their operator leaves unclear or mixed aren't in it. `agentNamed` finds an agent in a user agent by its token as a whole word; `agentOf` reads a request as a verified agent, a claimed name (not verified, so not counted as the agent), a signed assistant, another verified bot, or unknown; `stopTrainingLines` builds the robots.txt lines that stop training and keep search and people's questions.

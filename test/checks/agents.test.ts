@@ -27,6 +27,9 @@ describe("the AI agent table", () => {
     expect(agentNamed("NotGPTBotReally/1.0")).toBeNull();
     expect(agentNamed("Mozilla/5.0 Chrome/142.0")).toBeNull();
     expect(agentByToken("gptbot")?.purpose).toBe("training");
+    // The first appearance may be part of a longer word; a later one still names the agent.
+    expect(agentNamed("Googlebot-Video/1.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")?.token).toBe("Googlebot");
+    expect(agentNamed("Googlebot-Video/1.0")).toBeNull();
   });
 
   it("counts a name only when verified, calls a verified browser in the assistant category a signed assistant, and keeps others' categories", () => {
@@ -37,6 +40,14 @@ describe("the AI agent table", () => {
     expect(agentOf("KeenableBot/1.0", "Search Engine Crawler")).toEqual({ kind: "other", category: "Search Engine Crawler" });
     expect(agentOf("curl/8.14.1", "AI Assistant")).toEqual({ kind: "other", category: "AI Assistant" });
     expect(agentOf("Mozilla/5.0 Chrome/142.0", "")).toEqual({ kind: "unknown" });
+  });
+
+  it("gives each sending agent's token in the table's form and lowercase, for case-sensitive filters", async () => {
+    const { tokenForms } = await import("../../src/checks/agents.js");
+    expect(tokenForms()).toEqual(expect.arrayContaining(["Bingbot", "bingbot", "GPTBot", "gptbot", "ChatGPT-User", "chatgpt-user"]));
+    expect(tokenForms()).not.toContain("Google-Extended");
+    expect(tokenForms("user")).toEqual(expect.arrayContaining(["ChatGPT-User", "chatgpt-user"]));
+    expect(tokenForms("user")).not.toContain("GPTBot");
   });
 
   it("builds the stop-training lines from the table only", () => {
