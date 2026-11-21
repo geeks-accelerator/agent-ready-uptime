@@ -4,6 +4,7 @@
  * decided. Pure functions. Used by sitemap discovery (`Sitemap:` lines) and by
  * the robots.txt check.
  */
+import { AI_AGENTS } from "./agents.js";
 
 export interface RobotsRule {
   allow: boolean;
@@ -175,23 +176,11 @@ export interface Crawler {
   search?: boolean;
 }
 
-export const CRAWLERS: readonly Crawler[] = [
-  { name: "Googlebot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/142.0.0.0 Safari/537.36", search: true },
-  { name: "Bingbot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/142.0.0.0 Safari/537.36", search: true },
-  { name: "OAI-SearchBot", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot" },
-  { name: "Claude-SearchBot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +Claude-SearchBot@anthropic.com)" },
-  { name: "PerplexityBot", userAgent: "Mozilla/5.0 (compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)" },
-];
+/** The crawlers the robots.txt check and the free check judge, from the agent table (`judged`). */
+export const CRAWLERS: readonly Crawler[] = AI_AGENTS.filter((a) => a.judged).map((a) => ({ name: a.token, userAgent: a.userAgent!, ...(a.searchCritical ? { search: true } : {}) }));
 
-/** Crawlers the probes try at the door: the ones above, agents a person sends, and training crawlers. */
-export const CRAWLER_PROBES: readonly Crawler[] = [
-  ...CRAWLERS,
-  { name: "ChatGPT-User", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot" },
-  { name: "Claude-User", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)" },
-  { name: "Perplexity-User", userAgent: "Mozilla/5.0 (compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)" },
-  { name: "GPTBot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot" },
-  { name: "ClaudeBot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)" },
-];
+/** Crawlers the probes try at the door: the judged ones, agents a person sends, and training crawlers (`probe`). */
+export const CRAWLER_PROBES: readonly Crawler[] = [...CRAWLERS, ...AI_AGENTS.filter((a) => a.probe && !a.judged).map((a) => ({ name: a.token, userAgent: a.userAgent! }))];
 
 /**
  * A crawler probe's target: the page it fetches, named by a fragment
@@ -212,9 +201,16 @@ export function probeCrawler(name: string, extra: readonly Crawler[] = []): Craw
   return extra.find((c) => c.name === name) ?? CRAWLER_PROBES.find((c) => c.name === name) ?? null;
 }
 
+/**
+ * The robots.txt fingerprint's recipe: a hash of `RobotsState.rules`. Bumped when which lines count
+ * changes, so a monitor comparing fingerprints treats the new recipe as a new scheme, never as an edit
+ * (2: every AI agent's own group counts, 0.8.0).
+ */
+export const ROBOTS_FINGERPRINT = "robots2:";
+
 /** What a robots.txt check stores (the target's fingerprintData). */
 export interface RobotsState {
-  /** The rule lines that apply to CRAWLERS, normalised ("User-agent: *", "Disallow: /x"). */
+  /** The rule lines that apply to CRAWLERS, `*` and every agent in AI_AGENTS, normalised ("User-agent: *", "Disallow: /x"). */
   rules: string[];
   /** "Googlebot /pricing" pairs now blocked, each with the line that decided. */
   blocked: { pair: string; rule: string; agents: string }[];
@@ -254,6 +250,8 @@ export function robotsState(text: string, paths: string[]): RobotsState {
     }
     for (const g of robots.groups) if (g.agents.includes(c.name.toLowerCase()) || g.agents.includes("*")) groups.add(g);
   }
+  // Every AI agent's own group too, so a rule for one agent (User-agent: GPTBot) is seen as a change.
+  for (const g of robots.groups) if (AI_AGENTS.some((a) => g.agents.includes(a.token.toLowerCase()))) groups.add(g);
   const rules = [...groups].flatMap((g) => [...g.agents.map((a) => `User-agent: ${a}`), ...g.rules.map((r) => r.line)]);
   return { rules, blocked, allowed };
 }

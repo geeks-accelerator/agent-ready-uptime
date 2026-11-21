@@ -1,7 +1,6 @@
-import { FINGERPRINT_VERSION } from "./checks/mcp/check.js";
 import { describeToolChange } from "./checks/mcp/diff.js";
 import { describeRecordChange } from "./checks/net/dns.js";
-import { addFailure, bucketFor, daysUntil, DOMAIN_BUCKETS, isDown, NO_STREAK, SSL_BUCKETS } from "./checks/rules.js";
+import { addFailure, bucketFor, daysUntil, DOMAIN_BUCKETS, isDown, NO_STREAK, sameRecipe, SSL_BUCKETS } from "./checks/rules.js";
 import { judgeRegistration, type RegistrationState } from "./checks/domain/registration.js";
 import type { TargetState } from "./state.js";
 import type { Target } from "./targets.js";
@@ -87,12 +86,12 @@ export function judge(t: Target, before: TargetState, o: Outcome, siteName: stri
 
   // What it lists changed: an MCP server's tools, or a DNS record set (announced by type).
   if (o.fingerprint) {
-    const sameRecipe = before.fingerprint?.startsWith(FINGERPRINT_VERSION) && o.fingerprint.startsWith(FINGERPRINT_VERSION);
-    if (before.fingerprint && sameRecipe && before.fingerprint !== o.fingerprint) {
+    const same = sameRecipe(before.fingerprint, o.fingerprint);
+    if (before.fingerprint && same && before.fingerprint !== o.fingerprint) {
       if (t.spec?.kind === "mcp") alert("changed", `${siteName}: the MCP server's tools changed`, describeToolChange(before.fingerprintData, o.fingerprintData) || null);
       else if (t.kind === "dns" && t.announceChanges) alert("changed", `${siteName}: ${t.label} changed`, describeRecordChange(before.fingerprintData, o.fingerprintData) || null);
     }
-    if (before.fingerprint && before.fingerprint !== o.fingerprint && sameRecipe) s.changedAt = o.checkedAt;
+    if (before.fingerprint && before.fingerprint !== o.fingerprint && same) s.changedAt = o.checkedAt;
     s.fingerprint = o.fingerprint;
     s.fingerprintData = o.fingerprintData;
   }

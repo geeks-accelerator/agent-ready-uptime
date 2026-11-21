@@ -165,6 +165,7 @@ Each module is `agent-ready-uptime/checks/<module>`:
 | `domain/rdap` | a domain's expiry, registrar and status from RDAP (`noRdap` when its registry has no RDAP service) |
 | `domain/registration` | what a registration change means (`judgeRegistration`): a renewal the registrar made, or only the registry's own after expiry; bad statuses, removed locks, parking nameservers |
 | `robots` | robots.txt parsed by RFC 9309 with Google's precedence; what each AI crawler may read |
+| `agents` | the AI agents that read websites, by purpose (training, search, a person's question), each from its operator's docs |
 | `spec` | a check as data (`CheckSpec`), run by `runSpec`, validated by `specSchema` |
 | `rules` | when a failure is news (three in a row for a page) and when an expiry is announced |
 | `config` | a site's config keys (zod), shared with the hosted service |

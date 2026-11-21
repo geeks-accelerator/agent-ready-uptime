@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- `checks/agents`: one table of the AI agents that read websites, `AI_AGENTS`, each with its operator, its purpose (`training`, `search`, or `user`: fetching a page because a person asked), what its operator says about robots.txt (`follows`, or `may-ignore-for-a-person`), and the documentation page and date it came from (checked 2026-11-21). Agents whose purpose their operator leaves unclear or mixed aren't in it. `agentNamed` finds an agent in a user agent by its token as a whole word; `agentOf` reads a request as a verified agent, a claimed name (not verified, so not counted as the agent), a signed assistant, another verified bot, or unknown; `stopTrainingLines` builds the robots.txt lines that stop training and keep search and people's questions.
+- `CRAWLERS` and `CRAWLER_PROBES` are derived from the table (`judged`, `probe`), unchanged in content.
+- `robotsState` keeps every AI agent's own group in `rules`, not only the judged crawlers' and `*`, so a rule written for one agent (`User-agent: GPTBot`) is seen as a change. The fingerprint's recipe is now `robots2:` (`ROBOTS_FINGERPRINT`).
+- `sameRecipe(a, b)` in `checks/rules`: two fingerprints compare only when made the same way (the prefix before the first colon). The runner uses it, so a recipe change is never reported as a change, and robots.txt and DNS changes compare by their own recipe.
+
 ## 0.7.0
 
 - `checks/http/sign`: Web Bot Auth request signing (HTTP Message Signatures, RFC 9421, Ed25519), so a site's CDN can verify a monitor's requests instead of trusting a user agent anyone can copy. `signatureHeaders` covers `@authority` and `signature-agent` with `created`, `expires` (5 minutes), `keyid` (the RFC 7638 thumbprint), a nonce and `tag="web-bot-auth"`; `signaturesDirectory` builds the signed JWK Set served at `/.well-known/http-message-signatures-directory`; `newSigningKey`, `signerFrom`, `verifySignatureHeaders`.

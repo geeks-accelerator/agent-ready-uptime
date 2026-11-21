@@ -4,7 +4,7 @@ import { resolveUrl, sameUrl } from "../url.js";
 import { createHash } from "node:crypto";
 import { validateAgentFile, type AgentFileKind, type AgentFileReason } from "../agent/validate.js";
 import { fetchOnHost } from "./same-host.js";
-import { robotsState, robotsSummary } from "../robots.js";
+import { ROBOTS_FINGERPRINT, robotsState, robotsSummary } from "../robots.js";
 
 export interface PageCheckOptions {
   timeoutMs?: number;
@@ -165,7 +165,7 @@ export function evaluate(res: FetchResult, checkedAt: string, opts: PageCheckOpt
       // What it allows the crawlers that bring readers, on the site's own pages.
       const state = robotsState(bodyText, opts.robotsPaths ?? ["/"]);
       title = robotsSummary(state);
-      fingerprint = `robots:${createHash("sha256").update(state.rules.join("\n")).digest("hex").slice(0, 16)}`;
+      fingerprint = `${ROBOTS_FINGERPRINT}${createHash("sha256").update(state.rules.join("\n")).digest("hex").slice(0, 16)}`;
       fingerprintData = state;
     }
   }

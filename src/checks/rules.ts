@@ -63,3 +63,15 @@ export const SSL_BUCKETS = [14, 3];
 
 /** Days before a domain expires when it's announced (each threshold once). */
 export const DOMAIN_BUCKETS = [30, 14, 7, 1];
+
+/**
+ * Whether two content fingerprints were made the same way: the same recipe prefix, the text before the
+ * first colon ("c1:" for MCP tools and DNS records, "robots2:" for robots.txt). A recipe change reads
+ * as a new scheme, never as an edit, so neither monitor reports a change nobody made.
+ */
+export function sameRecipe(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const pa = a.indexOf(":");
+  const pb = b.indexOf(":");
+  return pa > 0 && pa === pb && a.slice(0, pa) === b.slice(0, pb);
+}

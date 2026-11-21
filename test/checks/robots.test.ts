@@ -41,8 +41,10 @@ describe("robots.txt state", () => {
     const s = robotsState("User-agent: *\nDisallow: /pricing\n\nUser-agent: GPTBot\nDisallow: /\n", paths);
     expect(s.blocked.map((b) => b.pair)).toEqual(["Googlebot /pricing", "Bingbot /pricing", "OAI-SearchBot /pricing", "Claude-SearchBot /pricing", "PerplexityBot /pricing"]);
     expect(s.blocked[0]).toMatchObject({ rule: "Disallow: /pricing", agents: "*" });
-    // GPTBot (training) isn't one of them, so its group isn't in the rules either.
-    expect(s.rules).toEqual(["User-agent: *", "Disallow: /pricing"]);
+    // GPTBot (training) isn't judged, but its own group counts in the rules, so a change to it is seen.
+    expect(s.rules).toEqual(["User-agent: *", "Disallow: /pricing", "User-agent: gptbot", "Disallow: /"]);
+    // A group for a crawler outside the table doesn't.
+    expect(robotsState("User-agent: SomeBot\nDisallow: /\n", paths).rules).toEqual([]);
     expect(robotsSummary(s)).toBe("blocks Googlebot from /pricing and 4 more");
     expect(robotsSummary(robotsState("", paths))).toBe("allows search crawlers");
   });
