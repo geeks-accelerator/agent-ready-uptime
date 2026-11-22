@@ -40,7 +40,7 @@ function slackDetail(a: Alert, esc: (s: string) => string): string | null {
  * for the receiver to escape, never markup.
  */
 export function webhookPayload(a: Alert, id: string): Record<string, unknown> {
-  return { type: `alert.${a.kind}`, version: 1, id, at: a.at, kind: a.kind, site: a.site, target: a.target, title: a.title, detail: a.detail, ...(a.when ? { when: a.when } : {}), url: a.url };
+  return { type: `alert.${a.kind}`, version: 1, id, at: a.at, kind: a.kind, site: a.site, target: a.target, title: a.title, detail: a.detail, ...(a.when ? { when: a.when } : {}), ...(a.confirmed ? { confirmed: a.confirmed } : {}), url: a.url };
 }
 
 export interface Sender {

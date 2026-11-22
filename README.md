@@ -25,11 +25,11 @@ For each site, with no configuration beyond its URL:
 | The domain's registration (RDAP) | daily | 30, 14, 7 and 1 days before it expires; when it expired and only the registry renewed it (the registrar may not have been paid); a hold, redemption or pending delete; a registrar lock removed; nameservers moved to a parking host |
 | Sitemaps (from robots.txt, `/sitemap.xml`, `/sitemap.json`) | every 30 minutes | one stops parsing or lists fewer URLs than `minUrls` |
 | Agent files: `llms.txt`, agent card, OpenAPI, MCP manifest, `robots.txt`, `security.txt` | hourly | one that was valid stops being valid (an HTML fallback served as `llms.txt` fails) |
-| The MCP server (from `/.well-known/mcp.json`, or configured) | hourly | the handshake fails, or its tools change: "removed `adopt`; added `adopt_v2`" |
+| The MCP server (from `/.well-known/mcp.json`, or configured) | hourly | the handshake fails, or its tools change and the new list reads the same three times (retried after 1 minute, then 5): "removed `adopt`; added `adopt_v2`" |
 | AI crawler access: the homepage and `llms.txt` fetched as Googlebot, Bingbot, GPTBot, ClaudeBot, PerplexityBot and others | hourly | a crawler that got in is turned away |
-| TCP ports and DNS records (configured) | every minute / 15 minutes | a port stops answering; a record set changes or loses an expected value |
+| TCP ports and DNS records (configured) | every minute / 15 minutes | a port stops answering; a record set changes (read the same three times) or loses an expected value |
 
-A file or crawler the site never served isn't an alert (that's the site's choice); one we've watched that goes away is. While a site's homepage is down, its other checks don't alert on their own: they fail because it does.
+A file or crawler the site never served isn't an alert (that's the site's choice); one we've watched that goes away is. Every alert says how it was confirmed ("Confirmed: 3 times over 6 minutes"): one bad answer, or a tool list read halfway, is never news. While a site's homepage is down, its other checks don't alert on their own: they fail because it does.
 
 Requests identify themselves as `agent-ready-uptime (+https://github.com/geeks-accelerator/agent-ready-uptime)` (set `MONITOR_USER_AGENT` to name your own), send no cookies or credentials, and refuse private and loopback addresses, so a config can't point it at your internal network.
 
@@ -167,7 +167,7 @@ Each module is `agent-ready-uptime/checks/<module>`:
 | `robots` | robots.txt parsed by RFC 9309 with Google's precedence; what each AI crawler may read |
 | `agents` | the AI agents that read websites, by purpose (training, search, a person's question), each from its operator's docs |
 | `spec` | a check as data (`CheckSpec`), run by `runSpec`, validated by `specSchema` |
-| `rules` | when a failure is news (three in a row for a page) and when an expiry is announced |
+| `rules` | when a failure is news (three in a row for a page), when a change is (`confirmChange`: the same new fingerprint three times), how it was confirmed in words (`confirmWords`), and when an expiry is announced |
 | `config` | a site's config keys (zod), shared with the hosted service |
 | `webhook` | Discord and Slack webhook URLs checked by host, generic ones by shape; posting with retries; Standard Webhooks signing (`signWebhook`, `webhookHeaders`); `publicFetch`, a `fetch` that never reaches a private address |
 | `chart`, `format`, `html/template` | a line's geometry with gaps kept, round axes, response times in words, escaped HTML |

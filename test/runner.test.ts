@@ -187,8 +187,14 @@ describe("a run against local sites", () => {
       site.set("/", { body: "<html><head><title>Ex</title></head><body>hello</body></html>" });
       mcp.state.tools = [{ name: "adopt_v2", inputSchema: { type: "object" } }, { name: "feed" }];
       await r.checkAll();
+      // A changed tool list is held until it's read the same three times (confirmChange).
+      expect(alerts.map((a) => a.kind)).toEqual(["down", "up"]);
+      await r.checkAll();
+      await r.checkAll();
       expect(alerts.map((a) => a.kind)).toEqual(["down", "up", "changed"]);
       expect(alerts[2]!.detail).toBe("removed `adopt`; added `adopt_v2`");
+      expect(alerts[2]!.confirmed).toBe("3 times");
+      expect(alerts[0]!.confirmed).toMatch(/^3 times/);
       await r.stop();
 
       const saved = await readState(statePath);

@@ -1,4 +1,5 @@
-/** Judgements both monitors make the same way: when a failure is news, and when an expiry is announced. */
+/** Judgements both monitors make the same way: when a failure or a change is news, and when an expiry is announced. */
+import { lasted } from "./format.js";
 /**
  * What the second location said about a failed check: it failed too ("both"),
  * it got an ok answer ("here_only": likely our network or our route), or it
@@ -74,4 +75,53 @@ export function sameRecipe(a: string | null | undefined, b: string | null | unde
   const pa = a.indexOf(":");
   const pb = b.indexOf(":");
   return pa > 0 && pa === pb && a.slice(0, pa) === b.slice(0, pb);
+}
+
+/**
+ * Reads of the same new fingerprint before a change is news: the read that saw it and its two
+ * retries (`PAGE_RETRIES`, about 6 minutes). A partial MCP tool list or a resolver answering
+ * from another pool reads as a change and then a change back; held this way, it's never sent.
+ */
+export const CHANGE_CONFIRM = PAGE_RETRIES.length + 1;
+
+/** A fingerprint that differs from the stored one, not yet read often enough to be news. */
+export interface PendingChange {
+  fingerprint: string;
+  /** Reads in a row that gave this fingerprint. */
+  reads: number;
+  /** When the first of them was read (ISO). */
+  firstAt: string;
+}
+
+export type ChangeVerdict =
+  /** No change: the stored fingerprint again (a pending one, if any, was a blip), or the first one ever, or a new recipe (never an edit). */
+  | { state: "same"; blip: boolean }
+  /** A new fingerprint, held: read again after `retryInS`. */
+  | { state: "pending"; pending: PendingChange; retryInS: number }
+  /** Read the same `reads` times in a row since `firstAt`: announce it. */
+  | { state: "changed"; reads: number; firstAt: string };
+
+/**
+ * Whether a fingerprint read now is a change: held until the same new value is read
+ * `CHANGE_CONFIRM` times in a row, retried on the `PAGE_RETRIES` schedule. Fingerprints made
+ * by another recipe never compare (`sameRecipe`).
+ */
+export function confirmChange(stored: string | null | undefined, pending: PendingChange | null | undefined, now: string, at: string): ChangeVerdict {
+  if (!stored || now === stored || !sameRecipe(stored, now)) return { state: "same", blip: !!pending && now === stored };
+  const reads = pending?.fingerprint === now ? pending.reads + 1 : 1;
+  const firstAt = pending?.fingerprint === now ? pending.firstAt : at;
+  if (reads >= CHANGE_CONFIRM) return { state: "changed", reads, firstAt };
+  return { state: "pending", pending: { fingerprint: now, reads, firstAt }, retryInS: PAGE_RETRIES[reads - 1] ?? PAGE_RETRIES.at(-1)! };
+}
+
+/**
+ * How a failure or a change was confirmed, in one line for an alert: "3 times over 6 minutes,
+ * from US West and US East", or "2 days running". `from`: the places it was seen, when there
+ * was more than one.
+ */
+export function confirmWords(c: { times: number; overMs: number; from?: string[] } | { days: number }): string {
+  if ("days" in c) return `${c.days} days running`;
+  const over = c.times > 1 && c.overMs >= 60_000 ? ` over ${lasted(c.overMs)}` : "";
+  const from = c.from && c.from.length > 1 ? `, from ${c.from.slice(0, -1).join(", ")} and ${c.from.at(-1)}` : c.from?.length === 1 ? `, from ${c.from[0]}` : "";
+  return `${c.times} time${c.times === 1 ? "" : "s"}${over}${from}`;
 }

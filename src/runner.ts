@@ -1,6 +1,7 @@
 import { discoverAgentFiles } from "./checks/agent/discover.js";
 import { lookupDomain } from "./checks/domain/rdap.js";
 import { discoverSitemaps, fetchSitemap } from "./checks/sitemap/fetch.js";
+import { PAGE_RETRIES } from "./checks/rules.js";
 import { DEFAULT_CHECKERS, runSpec, type Checkers } from "./checks/spec.js";
 import { siteUrl } from "./checks/url.js";
 import type { Sender } from "./alerts.js";
@@ -167,7 +168,8 @@ export class Runner {
       this.state.targets[t.key] = state;
       if (t.kind === "homepage") record(this.state, t.site, Date.parse(o.checkedAt), o.ok ? o.ttfbMs : null);
       // A failure is checked again sooner (the homepage: after 1 minute, then 5), until it's news.
-      const retry = !o.ok && !state.alerted ? t.retriesS[state.streak.failures - 1] : undefined;
+      // A new fingerprint not yet confirmed is read again on the same schedule (confirmChange).
+      const retry = !o.ok && !state.alerted ? t.retriesS[state.streak.failures - 1] : state.pendingChange ? PAGE_RETRIES[state.pendingChange.reads - 1] : undefined;
       this.next.set(t.key, Date.parse(o.checkedAt) + (retry ?? t.intervalS) * 1000);
       this.out(JSON.stringify({ t: o.checkedAt, site: t.site, check: t.label, url: t.url, ok: o.ok, ...(o.ttfbMs !== null ? { ttfbMs: Math.round(o.ttfbMs) } : {}), ...(o.ok ? {} : { error: o.error, detail: o.detail }) }));
       for (const a of alerts) {

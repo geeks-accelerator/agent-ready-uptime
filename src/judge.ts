@@ -1,6 +1,7 @@
 import { describeToolChange } from "./checks/mcp/diff.js";
 import { describeRecordChange } from "./checks/net/dns.js";
-import { addFailure, bucketFor, daysUntil, DOMAIN_BUCKETS, isDown, NO_STREAK, sameRecipe, SSL_BUCKETS } from "./checks/rules.js";
+import { lasted } from "./checks/format.js";
+import { addFailure, bucketFor, confirmChange, confirmWords, daysUntil, DOMAIN_BUCKETS, isDown, NO_STREAK, SSL_BUCKETS } from "./checks/rules.js";
 import { judgeRegistration, type RegistrationState } from "./checks/domain/registration.js";
 import type { TargetState } from "./state.js";
 import type { Target } from "./targets.js";
@@ -35,6 +36,8 @@ export interface Alert {
   when?: { at: string; word: "Since" | "On"; show: "time" | "date" };
   url: string;
   at: string;
+  /** How it was confirmed, in one line (`confirmWords`): "3 times over 6 minutes". */
+  confirmed?: string;
 }
 
 export type TimeFormat = "utc" | "discord" | "slack";
@@ -44,13 +47,14 @@ export type TimeFormat = "utc" | "discord" | "slack";
  * `<!date^…>` render in each reader's timezone (Slack falls back to the UTC text); logs say UTC.
  */
 export function alertDetail(a: Alert, format: TimeFormat): string | null {
-  if (!a.when) return a.detail;
+  const confirmed = a.confirmed ? `Confirmed: ${a.confirmed}.` : null;
+  if (!a.when) return [a.detail, confirmed].filter(Boolean).join(" ") || null;
   const ms = Date.parse(a.when.at);
   const unix = Math.floor(ms / 1000);
   const utc = a.when.show === "time" ? `${a.when.at.slice(11, 16)} UTC` : a.when.at.slice(0, 10);
   const written =
     format === "discord" ? `<t:${unix}:${a.when.show === "time" ? "t" : "D"}>` : format === "slack" ? `<!date^${unix}^${a.when.show === "time" ? "{time}" : "{date_short}"}|${utc}>` : utc;
-  return [a.detail, `${a.when.word} ${written}.`].filter(Boolean).join(" ");
+  return [a.detail, `${a.when.word} ${written}.`, confirmed].filter(Boolean).join(" ");
 }
 
 /**
@@ -62,7 +66,8 @@ export function alertDetail(a: Alert, format: TimeFormat): string | null {
  */
 export function judge(t: Target, before: TargetState, o: Outcome, siteName: string): { state: TargetState; alerts: Alert[] } {
   const alerts: Alert[] = [];
-  const alert = (kind: AlertKind, title: string, detail: string | null = null, when?: Alert["when"]) => alerts.push({ kind, site: t.site, target: t.label, title, detail, ...(when ? { when } : {}), url: t.url, at: o.checkedAt });
+  const alert = (kind: AlertKind, title: string, detail: string | null = null, when?: Alert["when"], confirmed?: string) =>
+    alerts.push({ kind, site: t.site, target: t.label, title, detail, ...(when ? { when } : {}), url: t.url, at: o.checkedAt, ...(confirmed ? { confirmed } : {}) });
   const outage = t.kind === "homepage" || t.kind === "port";
   const s: TargetState = { ...before, checkedAt: o.checkedAt, error: o.error, detail: o.detail, ttfbMs: o.ttfbMs };
   if (before.ok !== o.ok) s.since = o.checkedAt;
@@ -73,7 +78,8 @@ export function judge(t: Target, before: TargetState, o: Outcome, siteName: stri
     s.streak = addFailure(before.streak, "unavailable");
     if (!before.alerted && isDown(s.streak, t)) {
       s.alerted = true;
-      alert(outage ? "down" : "failing", outage ? `${siteName}: ${t.label} is down` : `${siteName}: ${t.label} is failing`, o.detail ?? o.error);
+      const firstAt = before.ok === false && before.since ? Date.parse(before.since) : Date.parse(o.checkedAt);
+      alert(outage ? "down" : "failing", outage ? `${siteName}: ${t.label} is down` : `${siteName}: ${t.label} is failing`, o.detail ?? o.error, undefined, confirmWords({ times: s.streak.failures, overMs: Date.parse(o.checkedAt) - firstAt }));
     }
     return { state: s, alerts };
   }
@@ -85,15 +91,20 @@ export function judge(t: Target, before: TargetState, o: Outcome, siteName: stri
   }
 
   // What it lists changed: an MCP server's tools, or a DNS record set (announced by type).
+  // Held until the same new value is read three times (confirmChange): a partial read isn't a change.
   if (o.fingerprint) {
-    const same = sameRecipe(before.fingerprint, o.fingerprint);
-    if (before.fingerprint && same && before.fingerprint !== o.fingerprint) {
-      if (t.spec?.kind === "mcp") alert("changed", `${siteName}: the MCP server's tools changed`, describeToolChange(before.fingerprintData, o.fingerprintData) || null);
-      else if (t.kind === "dns" && t.announceChanges) alert("changed", `${siteName}: ${t.label} changed`, describeRecordChange(before.fingerprintData, o.fingerprintData) || null);
+    const v = confirmChange(before.fingerprint, before.pendingChange, o.fingerprint, o.checkedAt);
+    s.pendingChange = v.state === "pending" ? v.pending : undefined;
+    if (v.state === "changed") {
+      const confirmed = confirmWords({ times: v.reads, overMs: Date.parse(o.checkedAt) - Date.parse(v.firstAt) });
+      if (t.spec?.kind === "mcp") alert("changed", `${siteName}: the MCP server's tools changed`, describeToolChange(before.fingerprintData, o.fingerprintData) || null, undefined, confirmed);
+      else if (t.kind === "dns" && t.announceChanges) alert("changed", `${siteName}: ${t.label} changed`, describeRecordChange(before.fingerprintData, o.fingerprintData) || null, undefined, confirmed);
+      s.changedAt = o.checkedAt;
     }
-    if (before.fingerprint && before.fingerprint !== o.fingerprint && same) s.changedAt = o.checkedAt;
-    s.fingerprint = o.fingerprint;
-    s.fingerprintData = o.fingerprintData;
+    if (v.state !== "pending") {
+      s.fingerprint = o.fingerprint;
+      s.fingerprintData = o.fingerprintData;
+    }
   }
 
   // A domain's registration: what changed since the last reading (judgeRegistration, shared with the
@@ -125,13 +136,5 @@ export function judge(t: Target, before: TargetState, o: Outcome, siteName: stri
   return { state: s, alerts };
 }
 
-/** "7 minutes", "2 hours 5 minutes", "3 days 4 hours": how long something lasted. */
-export function lasted(ms: number): string {
-  const m = Math.max(1, Math.round(ms / 60_000));
-  const unit = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  if (m < 60) return unit(m, "minute");
-  const h = Math.floor(m / 60);
-  if (h < 24) return m % 60 ? `${unit(h, "hour")} ${unit(m % 60, "minute")}` : unit(h, "hour");
-  const d = Math.floor(h / 24);
-  return h % 24 ? `${unit(d, "day")} ${unit(h % 24, "hour")}` : unit(d, "day");
-}
+/** How long something lasted ("7 minutes"): kept here for the runner and its readers, from `checks/format`. */
+export { lasted };

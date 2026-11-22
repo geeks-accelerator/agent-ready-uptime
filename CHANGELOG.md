@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+
+- `confirmChange(stored, pending, now, at)` in `checks/rules`: a fingerprint that differs from the stored one (an MCP server's tools, a DNS record set) is held until the same new value is read `CHANGE_CONFIRM` times in a row (3: the read that saw it and its retries after 1 and 5 minutes, `PAGE_RETRIES`). A read back to the stored one is a blip, never announced; another new value starts the count again; a new recipe is never an edit (`sameRecipe`). The runner retries a pending change on that schedule and keeps it in the state (`pendingChange`).
+- `confirmWords`: how a failure or change was confirmed, in one line ("3 times over 6 minutes, from US West and US East", "2 days running"). Down, failing and changed alerts carry it as `confirmed`; `alertDetail` adds "Confirmed: …", and the webhook body has `confirmed`.
+- `lasted` moved to `checks/format` (still exported from the judge).
+
 ## 0.8.1
 
 - `agentNamed` checks every place a token appears, so a user agent that names a longer word first ("Googlebot-Video … Googlebot/2.1") still names the agent.

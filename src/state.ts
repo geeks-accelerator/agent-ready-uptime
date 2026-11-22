@@ -2,7 +2,7 @@ import type { RegistrationState } from "./checks/domain/registration.js";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AgentTargetSpec } from "./checks/agent/discover.js";
-import { NO_STREAK, type FailureStreak } from "./checks/rules.js";
+import { NO_STREAK, type FailureStreak, type PendingChange } from "./checks/rules.js";
 
 /**
  * Everything the runner remembers, in one JSON file: so a restart doesn't alert again,
@@ -23,6 +23,8 @@ export interface TargetState {
   ttfbMs: number | null;
   /** MCP tools or DNS records, to say what changed. */
   fingerprint?: string;
+  /** A new fingerprint not yet read often enough to announce (`confirmChange`). */
+  pendingChange?: PendingChange | undefined;
   fingerprintData?: unknown;
   /** When what it lists last changed. */
   changedAt?: string;

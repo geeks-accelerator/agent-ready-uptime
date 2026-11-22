@@ -4,7 +4,7 @@ import { linePaths, msAxis } from "../../src/checks/chart.js";
 import { openDefaultsShape, openSiteSchema } from "../../src/checks/config.js";
 import { ms } from "../../src/checks/format.js";
 import { esc, html, raw, safeHref } from "../../src/checks/html/template.js";
-import { addFailure, bucketFor, daysUntil, isDown, NO_STREAK } from "../../src/checks/rules.js";
+import { addFailure, bucketFor, CHANGE_CONFIRM, confirmChange, confirmWords, daysUntil, isDown, NO_STREAK, PAGE_RETRIES, type PendingChange } from "../../src/checks/rules.js";
 import { runSpec, specSchema, type Checkers } from "../../src/checks/spec.js";
 import { isWebhook, maskWebhook, postWithRetries } from "../../src/checks/webhook.js";
 import { testServer } from "../../src/checks/testing/servers.js";
@@ -38,6 +38,31 @@ describe("rules", () => {
     expect(isDown(s, { confirmFailures: 3 })).toBe(false);
     s = addFailure(s, "unavailable");
     expect(isDown(s, { confirmFailures: 3 })).toBe(true);
+  });
+
+  it("holds a changed fingerprint until it's read the same three times, retried on the page schedule", () => {
+    const at = (m: number) => new Date(Date.parse("2026-11-21T10:00:00Z") + m * 60_000).toISOString();
+    expect(CHANGE_CONFIRM).toBe(PAGE_RETRIES.length + 1);
+    // The first fingerprint ever, a new recipe, or the same one: nothing to say.
+    expect(confirmChange(null, null, "c1:a", at(0))).toEqual({ state: "same", blip: false });
+    expect(confirmChange("c0:a", null, "c1:b", at(0))).toEqual({ state: "same", blip: false });
+    let v = confirmChange("c1:a", null, "c1:b", at(0));
+    expect(v).toEqual({ state: "pending", pending: { fingerprint: "c1:b", reads: 1, firstAt: at(0) }, retryInS: PAGE_RETRIES[0] });
+    // Back to the stored one: a blip, never announced.
+    expect(confirmChange("c1:a", (v as { pending: PendingChange }).pending, "c1:a", at(1))).toEqual({ state: "same", blip: true });
+    // Another new value starts the count again.
+    v = confirmChange("c1:a", (v as { pending: PendingChange }).pending, "c1:c", at(1));
+    expect(v).toMatchObject({ state: "pending", pending: { fingerprint: "c1:c", reads: 1 } });
+    v = confirmChange("c1:a", (v as { pending: PendingChange }).pending, "c1:c", at(2));
+    expect(v).toMatchObject({ state: "pending", pending: { reads: 2 }, retryInS: PAGE_RETRIES[1] });
+    expect(confirmChange("c1:a", (v as { pending: PendingChange }).pending, "c1:c", at(7))).toEqual({ state: "changed", reads: 3, firstAt: at(1) });
+  });
+
+  it("says how a failure was confirmed in one line", () => {
+    expect(confirmWords({ times: 3, overMs: 6 * 60_000, from: ["US West", "US East"] })).toBe("3 times over 6 minutes, from US West and US East");
+    expect(confirmWords({ times: 3, overMs: 5_000 })).toBe("3 times");
+    expect(confirmWords({ times: 1, overMs: 0, from: ["US West"] })).toBe("1 time, from US West");
+    expect(confirmWords({ days: 2 })).toBe("2 days running");
   });
 
   it("puts days left in the tightest bucket", () => {
