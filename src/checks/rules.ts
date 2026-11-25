@@ -133,7 +133,8 @@ export function confirmWords(c: { times: number; overMs: number; from?: string[]
  * it here; `chainWords` says it). In order:
  * - `hop_failed`: a redirect led to a step that answered neither 2xx nor 3xx (or didn't answer);
  * - `through_noindex`: a step before the page said noindex in its headers;
- * - `temporary`: a 302, 303 or 307 to another path on the same site, where a moved page wants 301 or 308;
+ * - `temporary`: a 302, 303 or 307 to another path on the same site, where a moved page wants 301 or 308
+ *   (never from the site's root, which may send each visitor to their language or region);
  * - `chain`: more than one redirect.
  * The HTTPS and `www.` hop to the same path is free (never counted, never temporary), and a redirect
  * to a sign-in page is a page behind a login, not a fault. `step` counts from 1, the address asked for.
@@ -173,7 +174,8 @@ export function judgeChain(hops: Hop[]): ChainVerdict | null {
     if (free) continue;
     counted++;
     if (hops[i]!.noindex && i > 0) return { kind: "through_noindex", step: i + 1 };
-    if (!firstTemporary && TEMPORARY.has(hops[i]!.statusCode ?? 0) && site.has(to.hostname.toLowerCase())) firstTemporary = { kind: "temporary", step: i + 1, status: hops[i]!.statusCode! };
+    // The site's root sending each visitor to their language or region (/ → /en) is temporary on purpose: it depends on who asks.
+    if (!firstTemporary && from.pathname !== "/" && TEMPORARY.has(hops[i]!.statusCode ?? 0) && site.has(to.hostname.toLowerCase())) firstTemporary = { kind: "temporary", step: i + 1, status: hops[i]!.statusCode! };
   }
   return firstTemporary ?? (counted > 1 ? { kind: "chain", redirects: counted } : null);
 }

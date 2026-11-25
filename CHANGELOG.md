@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1
+
+- `judgeChain` never calls a redirect from the site's root `temporary`: `/` sending each visitor to their language or region (`/` → `/en`, often a 307) depends on who asks, so it's temporary on purpose. A root that takes more than one redirect is still a `chain`.
+
 ## 0.10.0
 
 - Every redirect is recorded as a step (`Hop`, made by `hopOf` in `fetchUrl`, `fetchOnHost` and the test fetchers alike): its address, status, cache answer (`cacheOf`: Cloudflare's `cf-cache-status`, then `x-nextjs-cache`, then `x-vercel-cache`, kept only from the closed list `CACHE_STATES`) and whether its `X-Robots-Tag` said noindex. `FetchResult.redirects` entries carry them.

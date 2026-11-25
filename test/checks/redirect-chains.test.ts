@@ -75,6 +75,10 @@ describe("redirect chains", () => {
     it("flags the stuck chain after the fix: 307 to /preview, then 308 to the story", () => {
       expect(judgeChain([hop(`${base}/old`, 307), hop(`${base}/old/preview`, 308), hop(`${base}/new`, 200)])).toEqual({ kind: "temporary", step: 1, status: 307 });
     });
+    it("passes the root's language redirect, which is temporary on purpose", () => {
+      expect(judgeChain([hop(`${base}/`, 307), hop(`${base}/en`, 200)])).toBeNull();
+      expect(judgeChain([hop(`${base}/`, 302), hop(`${base}/en/`, 301), hop(`${base}/en`, 200)])).toEqual({ kind: "chain", redirects: 2 });
+    });
     it("flags more than one redirect", () => {
       expect(judgeChain([hop(`${base}/a`, 301), hop(`${base}/b`, 308), hop(`${base}/c`, 200)])).toEqual({ kind: "chain", redirects: 2 });
     });
