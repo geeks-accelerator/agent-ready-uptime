@@ -1,5 +1,7 @@
 /** Judgements both monitors make the same way: when a failure or a change is news, and when an expiry is announced. */
 import { lasted } from "./format.js";
+import type { Hop } from "./http/request.js";
+import { isLoginPath, journeyHosts } from "./url.js";
 /**
  * What the second location said about a failed check: it failed too ("both"),
  * it got an ok answer ("here_only": likely our network or our route), or it
@@ -124,4 +126,54 @@ export function confirmWords(c: { times: number; overMs: number; from?: string[]
   const over = c.times > 1 && c.overMs >= 60_000 ? ` over ${lasted(c.overMs)}` : "";
   const from = c.from && c.from.length > 1 ? `, from ${c.from.slice(0, -1).join(", ")} and ${c.from.at(-1)}` : c.from?.length === 1 ? `, from ${c.from[0]}` : "";
   return `${c.times} time${c.times === 1 ? "" : "s"}${over}${from}`;
+}
+
+/**
+ * What's wrong with a page's redirect chain, if anything, as one closed value (both monitors judge
+ * it here; `chainWords` says it). In order:
+ * - `hop_failed`: a redirect led to a step that answered neither 2xx nor 3xx (or didn't answer);
+ * - `through_noindex`: a step before the page said noindex in its headers;
+ * - `temporary`: a 302, 303 or 307 to another path on the same site, where a moved page wants 301 or 308;
+ * - `chain`: more than one redirect.
+ * The HTTPS and `www.` hop to the same path is free (never counted, never temporary), and a redirect
+ * to a sign-in page is a page behind a login, not a fault. `step` counts from 1, the address asked for.
+ */
+export type ChainVerdict =
+  | { kind: "hop_failed"; step: number; status: number | null }
+  | { kind: "through_noindex"; step: number }
+  | { kind: "temporary"; step: number; status: number }
+  | { kind: "chain"; redirects: number };
+
+/** Checks in a row with the same kind of chain fault before it's news (about 15 minutes for a page checked every 5). */
+export const CHAIN_CONFIRM = 3;
+
+const TEMPORARY = new Set([302, 303, 307]);
+
+export function judgeChain(hops: Hop[]): ChainVerdict | null {
+  if (hops.length < 2) return null;
+  const last = hops[hops.length - 1]!;
+  const ok = (s: number | null) => s !== null && s >= 200 && s < 400;
+  if (!ok(last.statusCode)) return { kind: "hop_failed", step: hops.length, status: last.statusCode };
+  const parse = (u: string) => {
+    try {
+      return new URL(u);
+    } catch {
+      return null;
+    }
+  };
+  const site = journeyHosts(hops[0]!.url);
+  let counted = 0;
+  let firstTemporary: ChainVerdict | null = null;
+  for (let i = 0; i < hops.length - 1; i++) {
+    const from = parse(hops[i]!.url);
+    const to = parse(hops[i + 1]!.url);
+    if (!from || !to) continue;
+    if (isLoginPath(to.pathname)) return null;
+    const free = from.pathname === to.pathname && from.search === to.search && journeyHosts(from.href).has(to.hostname.toLowerCase());
+    if (free) continue;
+    counted++;
+    if (hops[i]!.noindex && i > 0) return { kind: "through_noindex", step: i + 1 };
+    if (!firstTemporary && TEMPORARY.has(hops[i]!.statusCode ?? 0) && site.has(to.hostname.toLowerCase())) firstTemporary = { kind: "temporary", step: i + 1, status: hops[i]!.statusCode! };
+  }
+  return firstTemporary ?? (counted > 1 ? { kind: "chain", redirects: counted } : null);
 }

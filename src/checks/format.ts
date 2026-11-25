@@ -21,3 +21,29 @@ export function lasted(ms: number): string {
   const d = Math.floor(h / 24);
   return h % 24 ? `${unit(d, "day")} ${unit(h % 24, "hour")}` : unit(d, "day");
 }
+
+/**
+ * A redirect chain in one line, each step's status and cache with the address it went to:
+ * "307 (cache HIT) → /c/x/preview 404 (cache HIT)". The address asked for isn't repeated; another
+ * host is named. `place` writes a path (the hosted monitor's `safePlace`); by default, as it is.
+ */
+export function chainWords(hops: ReadonlyArray<{ url: string; statusCode: number | null; cache: string | null }>, place: (path: string) => string = (p) => p): string {
+  const first = (() => {
+    try {
+      return new URL(hops[0]?.url ?? "").host;
+    } catch {
+      return "";
+    }
+  })();
+  const where = (u: string) => {
+    try {
+      const url = new URL(u);
+      const path = place(url.pathname + url.search);
+      return url.host === first ? path : `${url.host}${path}`;
+    } catch {
+      return place(u);
+    }
+  };
+  const status = (h: { statusCode: number | null; cache: string | null }) => `${h.statusCode ?? "no answer"}${h.cache ? ` (cache ${h.cache})` : ""}`;
+  return hops.map((h, i) => (i === 0 ? status(h) : `→ ${where(h.url)} ${status(h)}`)).join(" ");
+}

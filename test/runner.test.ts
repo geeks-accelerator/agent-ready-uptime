@@ -175,9 +175,11 @@ describe("a run against local sites", () => {
       expect(alerts).toEqual([]);
       expect(r.state.targets[`ex:agent:mcp:${mcp.url}`]?.count).toBe(2);
 
-      site.set("/", { status: 500, body: "oops" });
+      // The homepage redirects to a page that isn't there: the alert says which step failed.
+      site.set("/", { status: 307, headers: { location: "/preview" } });
       for (let i = 0; i < 3; i++) await r.checkAll();
       expect(alerts.map((a) => a.kind)).toEqual(["down"]);
+      expect(alerts[0]!.detail).toContain("Path: 307 → /preview 404.");
       // The probes fail with it, but only the homepage alerted.
       expect(r.failing().map((t) => t.label)).toContain("Homepage");
 

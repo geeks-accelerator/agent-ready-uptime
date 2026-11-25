@@ -156,7 +156,7 @@ Each module is `agent-ready-uptime/checks/<module>`:
 | Module | What it does |
 |---|---|
 | `http/request` | `fetchUrl`: one request with DNS, connect, TLS and first-byte timings, the certificate's expiry, a size cap, and private addresses refused |
-| `http/page-check` | `checkPage`: a page judged (status, keyword, final URL, title and noindex, an agent file's format) |
+| `http/page-check` | `checkPage`: a page judged (status, keyword, final URL, title and noindex, an agent file's format), with every step of a redirect chain (`hops`: status, cache, noindex) |
 | `http/same-host` | `fetchOnHost`: redirects followed only on the site's own host |
 | `agent/discover`, `agent/validate` | find and validate `llms.txt`, the agent card, OpenAPI, the MCP manifest, `robots.txt` and `security.txt`; the crawler probes |
 | `mcp/check`, `mcp/diff` | an MCP handshake and tool list, fingerprinted; what changed between two lists |
@@ -167,7 +167,7 @@ Each module is `agent-ready-uptime/checks/<module>`:
 | `robots` | robots.txt parsed by RFC 9309 with Google's precedence; what each AI crawler may read |
 | `agents` | the AI agents that read websites, by purpose (training, search, a person's question), each from its operator's docs |
 | `spec` | a check as data (`CheckSpec`), run by `runSpec`, validated by `specSchema` |
-| `rules` | when a failure is news (three in a row for a page), when a change is (`confirmChange`: the same new fingerprint three times), how it was confirmed in words (`confirmWords`), and when an expiry is announced |
+| `rules` | when a failure is news (three in a row for a page), when a change is (`confirmChange`: the same new fingerprint three times), how it was confirmed in words (`confirmWords`), what's wrong with a redirect chain (`judgeChain`: a step that fails, a temporary redirect, more than one, one through a noindex step), and when an expiry is announced |
 | `config` | a site's config keys (zod), shared with the hosted service |
 | `webhook` | Discord and Slack webhook URLs checked by host, generic ones by shape; posting with retries; Standard Webhooks signing (`signWebhook`, `webhookHeaders`); `publicFetch`, a `fetch` that never reaches a private address |
 | `chart`, `format`, `html/template` | a line's geometry with gaps kept, round axes, response times in words, escaped HTML |

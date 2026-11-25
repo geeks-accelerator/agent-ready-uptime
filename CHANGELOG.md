@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0
+
+- Every redirect is recorded as a step (`Hop`, made by `hopOf` in `fetchUrl`, `fetchOnHost` and the test fetchers alike): its address, status, cache answer (`cacheOf`: Cloudflare's `cf-cache-status`, then `x-nextjs-cache`, then `x-vercel-cache`, kept only from the closed list `CACHE_STATES`) and whether its `X-Robots-Tag` said noindex. `FetchResult.redirects` entries carry them.
+- `PageCheckResult.hops`: the redirects and the last response as one path (empty without a redirect), so an alert can say which step failed instead of giving one status for three responses.
+- `judgeChain(hops)` in `checks/rules`: a step that failed after a redirect (`hop_failed`), a step marked noindex on the way (`through_noindex`), a temporary 302, 303 or 307 to another path on the site (`temporary`), or more than one redirect (`chain`). The HTTPS and `www.` hop to the same path is free, and a redirect to a sign-in page is fine. `CHAIN_CONFIRM` (3): checks in a row before it's news.
+- `chainWords(hops, place?)` in `checks/format`: "307 (cache HIT) → /old/preview 404 (cache HIT)". The runner's failing and down alerts add it as "Path: …".
+- `isLoginPath` in `checks/url`.
+
 ## 0.9.0
 
 - `confirmChange(stored, pending, now, at)` in `checks/rules`: a fingerprint that differs from the stored one (an MCP server's tools, a DNS record set) is held until the same new value is read `CHANGE_CONFIRM` times in a row (3: the read that saw it and its retries after 1 and 5 minutes, `PAGE_RETRIES`). A read back to the stored one is a blip, never announced; another new value starts the count again; a new recipe is never an edit (`sameRecipe`). The runner retries a pending change on that schedule and keeps it in the state (`pendingChange`).

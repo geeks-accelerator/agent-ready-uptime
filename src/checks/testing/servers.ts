@@ -6,7 +6,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import zlib from "node:zlib";
-import type { FetchResult } from "../http/request.js";
+import { hopOf, type FetchResult } from "../http/request.js";
 import { createFakeMcp, type FakeMcpState } from "./fake-mcp.js";
 
 export interface Route {
@@ -95,7 +95,7 @@ export function redirecting(answer: (url: string) => FetchResult | Promise<Fetch
       const location = typeof res.headers.location === "string" ? res.headers.location : null;
       if (res.statusCode === null || res.statusCode < 300 || res.statusCode >= 400 || !location) return { ...res, url, finalUrl: current, redirects };
       if (hop >= max) return { ...res, url, finalUrl: current, redirects, error: "too_many_redirects", errorMessage: `more than ${max} redirects` };
-      redirects.push({ url: current, statusCode: res.statusCode });
+      redirects.push(hopOf(current, res.statusCode, res.headers));
       let next: URL;
       try {
         next = new URL(location, current);

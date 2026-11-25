@@ -146,6 +146,16 @@ export function journeyHosts(baseUrl: string): Set<string> {
   return new Set([host, host.startsWith("www.") ? host.slice(4) : `www.${host}`]);
 }
 
+/**
+ * A sign-in page, however it's spelled: /login, /wp-login.php, /users/sign_in, /signin.html,
+ * /oauth/authorize, /sso. "auth" only as a whole word, so /author/… isn't one.
+ */
+export function isLoginPath(pathname: string): boolean {
+  const p = pathname.toLowerCase();
+  if (/log[-_]?in|log[-_]?on|sign[-_]?in|sign[-_]?on/.test(p)) return true;
+  return p.split(/[^a-z]+/).some((w) => w === "auth" || w === "oauth" || w === "authorize" || w === "sso");
+}
+
 /** A URL's host and effective port ("example.com:443"); null for unparseable input. */
 export function hostPort(raw: string): string | null {
   try {

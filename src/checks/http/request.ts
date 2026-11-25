@@ -8,6 +8,7 @@ import dns, { type LookupAddress, type LookupOptions } from "node:dns";
 import net from "node:net";
 import type { Transform } from "node:stream";
 import { signatureHeaders, signerFrom, type Signer } from "./sign.js";
+import { headerNoindex } from "../html/head.js";
 
 /** Our honest user agent: `MONITOR_USER_AGENT` names your monitor instead (site owners allowlist it in their WAF). */
 export const DEFAULT_USER_AGENT =
@@ -96,12 +97,42 @@ export interface TlsInfo {
   protocol: string | null;
 }
 
+/**
+ * A cache's answer as a response's headers give it, from a closed list, so nothing else a site
+ * sends is kept: Cloudflare's `cf-cache-status` first, then Next.js's and Vercel's own.
+ */
+export const CACHE_STATES = ["HIT", "MISS", "STALE", "EXPIRED", "BYPASS", "DYNAMIC", "REVALIDATED", "UPDATING", "PRERENDER"] as const;
+export type CacheState = (typeof CACHE_STATES)[number];
+const CACHE_HEADERS = ["cf-cache-status", "x-nextjs-cache", "x-vercel-cache"] as const;
+
+export function cacheOf(headers: IncomingHttpHeaders): CacheState | null {
+  for (const h of CACHE_HEADERS) {
+    const v = headerValue(headers[h])?.trim().toUpperCase();
+    if (v && (CACHE_STATES as readonly string[]).includes(v)) return v as CacheState;
+  }
+  return null;
+}
+
+/** One step of a redirect chain: the address, its status (null: no answer), its cache and whether its headers said noindex. */
+export interface Hop {
+  url: string;
+  statusCode: number | null;
+  cache: CacheState | null;
+  noindex: boolean;
+}
+
+/** A step as every fetcher records it (`fetchUrl`, `fetchOnHost`, the test fetchers): one shape, closed values only. */
+export function hopOf(url: string, statusCode: number | null, headers: IncomingHttpHeaders): Hop {
+  return { url, statusCode, cache: cacheOf(headers), noindex: headerNoindex(headers["x-robots-tag"]) };
+}
+
 export interface FetchResult {
   url: string;
   finalUrl: string;
   statusCode: number | null;
   headers: IncomingHttpHeaders;
-  redirects: Array<{ url: string; statusCode: number }>;
+  /** Every redirect followed, in order (`hopOf`): where it was asked, how it answered. */
+  redirects: Hop[];
   timings: Timings;
   /** Decompressed body, capped at maxBytes. */
   body: Buffer;
@@ -331,7 +362,7 @@ export async function fetchUrl(url: string, opts: FetchOptions = {}): Promise<Fe
       if (hop >= maxRedirects) {
         return base({ statusCode: res.statusCode, headers: res.headers, error: "too_many_redirects", errorMessage: `more than ${maxRedirects} redirects` });
       }
-      redirects.push({ url: current, statusCode: res.statusCode });
+      redirects.push(hopOf(current, res.statusCode, res.headers));
       redirectMs += res.timings.hopMs;
       let next: URL;
       try {

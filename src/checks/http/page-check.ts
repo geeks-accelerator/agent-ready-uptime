@@ -1,4 +1,4 @@
-import { fetchUrl, headerValue, type FetchResult, type RequestProfile, type Timings, type TlsInfo } from "./request.js";
+import { fetchUrl, headerValue, hopOf, type FetchResult, type Hop, type RequestProfile, type Timings, type TlsInfo } from "./request.js";
 import { headerNoindex, pageMeta, parseHead, type PageMeta } from "../html/head.js";
 import { resolveUrl, sameUrl } from "../url.js";
 import { createHash } from "node:crypto";
@@ -39,6 +39,11 @@ export interface PageCheckResult {
   ok: boolean;
   statusCode: number | null;
   redirectCount: number;
+  /**
+   * The whole path when there was a redirect: each redirect, then the last response (empty
+   * without one). A redirect that wasn't followed (off the host, one too many) ends it.
+   */
+  hops: Hop[];
   /** Machine-readable reason, null when ok. */
   error: string | null;
   /** Human-readable detail for alerts. */
@@ -89,6 +94,14 @@ export async function checkPage(url: string, opts: PageCheckOptions = {}): Promi
   const r = evaluate(res, checkedAt, opts);
   if (offHost || badLocation) return { ...r, ok: false, error: "redirect_off_host", errorDetail: describeError("redirect_off_host", r.statusCode) };
   return r;
+}
+
+/** The redirects and the last response as one path; a redirect that wasn't followed is already the last step. */
+export function hopsOf(res: FetchResult): Hop[] {
+  if (!res.redirects.length) return [];
+  // fetchUrl stops at a redirect off the host without fetching where it pointed (finalUrl), and at a bad Location on the step it recorded.
+  const unfollowed = res.error === "redirect_off_host" || res.finalUrl === res.redirects.at(-1)!.url;
+  return unfollowed ? [...res.redirects] : [...res.redirects, hopOf(res.finalUrl, res.statusCode, res.headers)];
 }
 
 export function evaluate(res: FetchResult, checkedAt: string, opts: PageCheckOptions = {}): PageCheckResult {
@@ -177,6 +190,7 @@ export function evaluate(res: FetchResult, checkedAt: string, opts: PageCheckOpt
     ok: error === null,
     statusCode: status,
     redirectCount: res.redirects.length,
+    hops: hopsOf(res),
     error,
     errorDetail,
     timings: res.timings,

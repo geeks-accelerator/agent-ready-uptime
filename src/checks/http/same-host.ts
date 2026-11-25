@@ -6,7 +6,7 @@
  * applies to every hop.
  */
 import { journeyHosts } from "../url.js";
-import { headerValue, type FetchResult } from "./request.js";
+import { headerValue, hopOf, type FetchResult } from "./request.js";
 
 export interface OnHostResult {
   /** The last response, with `url` the address asked for, `finalUrl` the last one fetched, and every hop in `redirects`. */
@@ -35,7 +35,7 @@ export async function fetchOnHost(url: string, get: (u: string) => Promise<Fetch
       return done(null, true);
     }
     if (!hosts.has(next.hostname.toLowerCase()) || next.username || next.password) return done(next.href);
-    redirects.push({ url: current, statusCode: res.statusCode! });
+    redirects.push(hopOf(current, res.statusCode, res.headers));
     current = next.href;
     res = await get(current);
   }

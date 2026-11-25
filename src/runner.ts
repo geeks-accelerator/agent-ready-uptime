@@ -4,6 +4,7 @@ import { discoverSitemaps, fetchSitemap } from "./checks/sitemap/fetch.js";
 import { PAGE_RETRIES } from "./checks/rules.js";
 import { DEFAULT_CHECKERS, runSpec, type Checkers } from "./checks/spec.js";
 import { siteUrl } from "./checks/url.js";
+import { chainWords } from "./checks/format.js";
 import type { Sender } from "./alerts.js";
 import type { Config, Site } from "./config.js";
 import { alertDetail, judge, type Alert, type Outcome } from "./judge.js";
@@ -207,7 +208,8 @@ export class Runner {
       ok: r.ok,
       checkedAt: r.checkedAt,
       error: r.error,
-      detail: r.errorDetail,
+      // A failure behind a redirect says which step failed: "Path: 307 → /preview 404".
+      detail: !r.ok && r.hops.length ? [r.errorDetail, `Path: ${chainWords(r.hops)}.`].filter(Boolean).join(". ") : r.errorDetail,
       ttfbMs: r.timings.ttfbMs,
       ...(r.fingerprint ? { fingerprint: r.fingerprint, fingerprintData: r.fingerprintData } : {}),
       ...(t.kind === "homepage" && t.url.startsWith("https:") && r.ok ? { expiresAt: r.tls?.validTo ?? null } : {}),
