@@ -18,6 +18,12 @@ export interface SitemapFetchResult {
   entries: SitemapEntry[];
   childCount: number;
   childErrors: string[];
+  /**
+   * The sitemap asks browsers to style it with XSLT (`<?xml-stylesheet … type="text/xsl"?>`): Chrome
+   * 158 (2026-11-17) no longer runs XSLT, so people opening it see unstyled XML. Crawlers never used
+   * it. A CSS stylesheet is fine and isn't counted.
+   */
+  stylesheet: boolean;
   /** The request for the sitemap itself (timing, status, size…). */
   check: PageCheckResult;
 }
@@ -58,6 +64,7 @@ export async function fetchSitemap(url: string, opts: SitemapFetchOptions = {}):
     entries: [],
     childCount: 0,
     childErrors: [],
+    stylesheet: false,
     check,
   };
 
@@ -72,6 +79,7 @@ export async function fetchSitemap(url: string, opts: SitemapFetchOptions = {}):
     return result;
   }
 
+  result.stylesheet = usesXslt(check.raw.body);
   try {
     const parsed = parseSitemap(check.raw.body, { url: check.finalUrl, contentType: check.contentType, maxBytes: reqOpts.maxBytes });
     result.format = parsed.format;
@@ -186,4 +194,10 @@ export async function discoverSitemaps(
     }
   }
   return { urls, notes, robots: parsedRobots };
+}
+
+/** Does an XML document's prolog ask for an XSLT stylesheet? Only the first 2 KB are read (the prolog comes first). */
+export function usesXslt(body: Buffer): boolean {
+  const head = body.subarray(0, 2048).toString("utf8");
+  return /<\?xml-stylesheet\b[^>]*?(?:type\s*=\s*["'](?:text|application)\/xslt?\+?(?:xml)?["']|href\s*=\s*["'][^"']*\.xslt?(?:[?#][^"']*)?["'])/i.test(head);
 }

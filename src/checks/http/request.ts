@@ -92,6 +92,8 @@ export interface Timings {
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface TlsInfo {
+  /** When the certificate starts: with `validTo`, its lifetime, which says when a self-renewing one should have renewed. */
+  validFrom: string | null;
   validTo: string | null;
   issuer: string | null;
   protocol: string | null;
@@ -488,6 +490,7 @@ function requestOnce(u: URL, o: OnceOptions): Promise<HopResult> {
         try {
           const cert = s.getPeerCertificate();
           tls = {
+            validFrom: cert?.valid_from ? new Date(cert.valid_from).toISOString() : null,
             validTo: cert?.valid_to ? new Date(cert.valid_to).toISOString() : null,
             issuer: (cert?.issuer?.O as string | undefined) ?? (cert?.issuer?.CN as string | undefined) ?? null,
             protocol: s.getProtocol?.() ?? null,

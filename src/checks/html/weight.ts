@@ -3,12 +3,45 @@ import { urlActs } from "../actions.js";
 import { isHttpUrl } from "../url.js";
 import { decodeEntities } from "./head.js";
 
+/**
+ * Scripts Cloudflare adds to a page, recognised by their path on the site (`/cdn-cgi/…`) or by
+ * Cloudflare's own host. Closed names, so nothing else of the page is kept.
+ */
+export const CDN_SCRIPTS = ["email_protection", "rocket_loader", "web_analytics", "challenge", "other"] as const;
+export type CdnScript = (typeof CDN_SCRIPTS)[number];
+
+export function cdnScriptOf(src: string): CdnScript | null {
+  let u: URL;
+  try {
+    u = new URL(src);
+  } catch {
+    return null;
+  }
+  if (u.hostname === "static.cloudflareinsights.com") return "web_analytics";
+  if (!u.pathname.startsWith("/cdn-cgi/")) return null;
+  if (u.pathname.includes("email-decode")) return "email_protection";
+  if (u.pathname.includes("rocket-loader")) return "rocket_loader";
+  if (u.pathname.startsWith("/cdn-cgi/challenge-platform/")) return "challenge";
+  return "other";
+}
+
+/** Script types that hold data and never run. */
+const DATA_TYPES = new Set(["application/ld+json", "application/json", "importmap", "speculationrules"]);
+
 /** What one HTML document weighs, and what it links to and loads. */
 export interface HtmlWeight {
-  /** Every <script> tag. */
+  /** <script> tags that run: every one but data blocks (`dataBlocks`). */
   scripts: number;
-  /** Bytes of script content inside the HTML. */
+  /** Bytes of script content inside the HTML, data blocks left out. */
   inlineScriptBytes: number;
+  /**
+   * <script> tags that only carry data and never run: structured data (`application/ld+json`), JSON,
+   * import maps and speculation rules. `__NEXT_DATA__` stays with the scripts, as repeated page data.
+   */
+  dataBlocks: number;
+  dataBytes: number;
+  /** Scripts the CDN added to the page, by what they are (`CDN_SCRIPTS`): counted in `scripts` too, so the site isn't blamed for them. */
+  cdnScripts: CdnScript[];
   /** Repeated page data for a JS framework: Next.js flight data (self.__next_f.push) and __NEXT_DATA__. */
   frameworkBytes: number;
   /** External scripts and stylesheets, absolute, deduplicated, in order. */
@@ -86,7 +119,7 @@ const utf8 = (s: string) => Buffer.byteLength(s, "utf8");
 
 /** One pass over the document with the same parser as head.ts. */
 export function measureHtml(html: string, pageUrl: string): HtmlWeight {
-  const w: HtmlWeight = { scripts: 0, inlineScriptBytes: 0, frameworkBytes: 0, jsUrls: [], cssUrls: [], images: 0, lazyImages: 0, svgBytes: 0, inlineStyleBytes: 0, imageMarkupBytes: 0, elements: 0, links: [], speculation: [], lang: null, searchForm: false, anchors: [], rootId: null, rootElements: 0 };
+  const w: HtmlWeight = { scripts: 0, inlineScriptBytes: 0, dataBlocks: 0, dataBytes: 0, cdnScripts: [], frameworkBytes: 0, jsUrls: [], cssUrls: [], images: 0, lazyImages: 0, svgBytes: 0, inlineStyleBytes: 0, imageMarkupBytes: 0, elements: 0, links: [], speculation: [], lang: null, searchForm: false, anchors: [], rootId: null, rootElements: 0 };
   // The mount point's depth in the element stack while it's open (-1: not open), to count what's inside it.
   let rootDepth = -1;
   const js = new Set<string>();
@@ -109,6 +142,7 @@ export function measureHtml(html: string, pageUrl: string): HtmlWeight {
   let inScript = false;
   let scriptIsData = false;
   let scriptIsRules = false;
+  let scriptIsBlock = false;
   let scriptText = "";
   let svgDepth = 0;
   let svgStart = 0;
@@ -168,12 +202,19 @@ export function measureHtml(html: string, pageUrl: string): HtmlWeight {
           if (svgDepth === 0) svgStart = parser.startIndex;
           svgDepth++;
         } else if (name === "script") {
-          w.scripts++;
-          const src = abs(attrs.src);
-          if (src) js.add(src);
-          inScript = !attrs.src;
+          const type = (attrs.type ?? "").trim().toLowerCase();
           scriptIsData = attrs.id === "__NEXT_DATA__";
-          scriptIsRules = (attrs.type ?? "").trim().toLowerCase() === "speculationrules";
+          scriptIsRules = type === "speculationrules";
+          scriptIsBlock = DATA_TYPES.has(type) && !scriptIsData;
+          if (scriptIsBlock) w.dataBlocks++;
+          else w.scripts++;
+          const src = abs(attrs.src);
+          if (src) {
+            js.add(src);
+            const cdn = cdnScriptOf(src);
+            if (cdn) w.cdnScripts.push(cdn);
+          }
+          inScript = !attrs.src;
           scriptText = "";
         } else if (name === "link") {
           const rel = (attrs.rel ?? "").toLowerCase().split(/\s+/);
@@ -230,7 +271,8 @@ export function measureHtml(html: string, pageUrl: string): HtmlWeight {
           if (svgDepth === 0) w.svgBytes += utf8(html.slice(svgStart, parser.endIndex + 1));
         } else if (name === "script" && inScript) {
           const bytes = utf8(scriptText);
-          w.inlineScriptBytes += bytes;
+          if (scriptIsBlock) w.dataBytes += bytes;
+          else w.inlineScriptBytes += bytes;
           if (scriptIsData || scriptText.includes("self.__next_f.push")) w.frameworkBytes += bytes;
           if (scriptIsRules) w.speculation.push(...speculationRules(scriptText).filter((r) => !w.speculation.some((x) => x.action === r.action && x.eagerness === r.eagerness)));
           inScript = false;

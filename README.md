@@ -156,6 +156,7 @@ Each module is `agent-ready-uptime/checks/<module>`:
 | Module | What it does |
 |---|---|
 | `http/request` | `fetchUrl`: one request with DNS, connect, TLS and first-byte timings, the certificate's expiry, a size cap, and private addresses refused |
+| `html/weight` | what a page weighs: scripts apart from data blocks (JSON-LD, import maps), and the scripts a CDN added (`cdnScripts`) |
 | `http/page-check` | `checkPage`: a page judged (status, keyword, final URL, title and noindex, an agent file's format), with every step of a redirect chain (`hops`: status, cache, noindex) |
 | `http/same-host` | `fetchOnHost`: redirects followed only on the site's own host |
 | `agent/discover`, `agent/validate` | find and validate `llms.txt`, the agent card, OpenAPI, the MCP manifest, `robots.txt` and `security.txt`; the crawler probes |

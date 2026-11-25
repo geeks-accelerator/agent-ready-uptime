@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0
+
+- `measureHtml` counts data blocks apart from scripts: `<script>` tags of type `application/ld+json`, `application/json`, `importmap` and `speculationrules` never run, so they're `dataBlocks` and `dataBytes`, no longer in `scripts` or `inlineScriptBytes`. `__NEXT_DATA__` stays with the scripts, as repeated page data (`frameworkBytes`). Speculation rules are still read.
+- `HtmlWeight.cdnScripts` and `cdnScriptOf(src)`: scripts Cloudflare adds to a page, by closed name (`CDN_SCRIPTS`: `email_protection`, `rocket_loader`, `web_analytics`, `challenge`, `other`), recognised by `/cdn-cgi/` on the site or Cloudflare's analytics host. They still count in `scripts`; the name lets a report say who added them.
+- `SitemapFetchResult.stylesheet` and `usesXslt(body)`: a sitemap that asks browsers to style it with XSLT. Chrome 158 (2026-11-17) no longer runs XSLT, so people opening it see unstyled XML; crawlers never used it. A CSS stylesheet isn't counted.
+- `TlsInfo.validFrom`, beside `validTo`, from page and port checks alike: a certificate's lifetime, which says when a self-renewing one should have renewed.
+
 ## 0.10.1
 
 - `judgeChain` never calls a redirect from the site's root `temporary`: `/` sending each visitor to their language or region (`/` → `/en`, often a 307) depends on who asks, so it's temporary on purpose. A root that takes more than one redirect is still a `chain`.

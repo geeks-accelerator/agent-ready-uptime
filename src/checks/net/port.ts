@@ -86,6 +86,7 @@ export async function checkPort(url: string, opts: PortCheckOptions = {}): Promi
         tSecure = performance.now();
         const cert = secure.getPeerCertificate();
         tlsInfo = {
+          validFrom: cert?.valid_from ? new Date(cert.valid_from).toISOString() : null,
           validTo: cert?.valid_to ? new Date(cert.valid_to).toISOString() : null,
           issuer: (cert?.issuer?.O as string | undefined) ?? (cert?.issuer?.CN as string | undefined) ?? null,
           protocol: secure.getProtocol?.() ?? null,
