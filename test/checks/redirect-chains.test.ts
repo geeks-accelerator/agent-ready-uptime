@@ -79,6 +79,10 @@ describe("redirect chains", () => {
       expect(judgeChain([hop(`${base}/`, 307), hop(`${base}/en`, 200)])).toBeNull();
       expect(judgeChain([hop(`${base}/`, 302), hop(`${base}/en/`, 301), hop(`${base}/en`, 200)])).toEqual({ kind: "chain", redirects: 2 });
     });
+    it("passes a shortcut to a view (alaskanews.com's /trending → /?sort=hot)", () => {
+      expect(judgeChain([hop(`${base}/trending`, 307), hop(`${base}/?sort=hot`, 200)])).toBeNull();
+      expect(judgeChain([hop(`${base}/old`, 307), hop(`${base}/new`, 200)])).toEqual({ kind: "temporary", step: 1, status: 307 });
+    });
     it("flags more than one redirect", () => {
       expect(judgeChain([hop(`${base}/a`, 301), hop(`${base}/b`, 308), hop(`${base}/c`, 200)])).toEqual({ kind: "chain", redirects: 2 });
     });

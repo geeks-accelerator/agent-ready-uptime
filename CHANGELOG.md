@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1
+
+- `judgeChain` never calls a redirect to an address with a query `temporary`: a shortcut to a view (`/trending` → `/?sort=hot`) is temporary on purpose, not a page that moved. More than one redirect is still a `chain`.
+
 ## 0.11.0
 
 - `measureHtml` counts data blocks apart from scripts: `<script>` tags of type `application/ld+json`, `application/json`, `importmap` and `speculationrules` never run, so they're `dataBlocks` and `dataBytes`, no longer in `scripts` or `inlineScriptBytes`. `__NEXT_DATA__` stays with the scripts, as repeated page data (`frameworkBytes`). Speculation rules are still read.
